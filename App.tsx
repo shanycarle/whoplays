@@ -85,6 +85,8 @@ function Root() {
   const [tab, setTab] = useState<TabKey>('search');
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null); // null = les deux équipes
   const [profileOpen, setProfileOpen] = useState(false);
+  const [installPromptVisible, setInstallPromptVisible] = useState(false);
+  const installPromptRef = useRef<any>(null);
   const triedDemo = useRef(false);
 
   // Player zoom popup
@@ -200,6 +202,59 @@ function Root() {
   useEffect(() => {
     void locate();
   }, [locate]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+
+    const win = window as Window & typeof globalThis & {
+      beforeinstallprompt?: (event: Event) => void;
+      appinstalled?: () => void;
+    };
+    const isStandalone = win.matchMedia?.('(display-mode: standalone)').matches || Boolean((win.navigator as Navigator & { standalone?: boolean }).standalone);
+    if (isStandalone) return;
+
+    const handleBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      installPromptRef.current = event;
+      setInstallPromptVisible(true);
+    };
+
+    const handleAppInstalled = () => {
+      installPromptRef.current = null;
+      setInstallPromptVisible(false);
+    };
+
+    const timer = window.setTimeout(() => setInstallPromptVisible(true), 1200);
+
+    win.addEventListener?.('beforeinstallprompt', handleBeforeInstallPrompt as EventListener);
+    win.addEventListener?.('appinstalled', handleAppInstalled as EventListener);
+
+    return () => {
+      window.clearTimeout(timer);
+      win.removeEventListener?.('beforeinstallprompt', handleBeforeInstallPrompt as EventListener);
+      win.removeEventListener?.('appinstalled', handleAppInstalled as EventListener);
+    };
+  }, []);
+
+  const handleInstallPwa = useCallback(async () => {
+    const event = installPromptRef.current;
+    if (!event) {
+      setInstallPromptVisible(false);
+      return;
+    }
+
+    try {
+      await (event as any).prompt();
+      const choice = await (event as any).userChoice;
+      if (choice?.outcome === 'accepted') {
+        installPromptRef.current = null;
+      }
+    } catch {
+      // noop
+    } finally {
+      setInstallPromptVisible(false);
+    }
+  }, []);
 
   const activeMatch: Match | null = geo?.active_match ?? null;
 
@@ -378,7 +433,46 @@ function Root() {
         loading={profileLoading}
         onClose={() => setSelected(null)}
       />
+
+      <InstallPwaPrompt
+        visible={installPromptVisible}
+        onClose={() => setInstallPromptVisible(false)}
+        onInstall={handleInstallPwa}
+        s={s}
+      />
     </View>
+  );
+}
+
+function InstallPwaPrompt({ visible, onClose, onInstall, s }: { visible: boolean; onClose: () => void; onInstall: () => void; s: Styles }) {
+  if (Platform.OS !== 'web') return null;
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={s.modalBackdrop} onPress={onClose}>
+        <Pressable style={[s.modalSheet, { borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg }] } onPress={(e) => e.stopPropagation()}>
+          <View style={s.modalHandle} />
+          <Text style={s.modalTitle}>Installer WhoPlays</Text>
+          <View style={[s.preview, { backgroundColor: '#F3F7FF', marginTop: spacing.md }] }>
+            <Ionicons name="phone-portrait-outline" size={24} color={s.previewText.color} />
+            <View style={{ flex: 1 }}>
+              <Text style={s.previewText}>Pour une meilleure expérience, ajoutez WhoPlays à l’écran d’accueil.</Text>
+              <Text style={{ color: '#64748B', fontSize: 13, marginTop: 6 }}>
+                Vous bénéficierez du plein écran et d’un accès plus rapide à chaque visite.
+              </Text>
+            </View>
+          </View>
+          <View style={s.modalActions}>
+            <Pressable style={[s.modalBtn, s.modalBtnGhost]} onPress={onClose}>
+              <Text style={[s.modalBtnText, { color: '#334155' }]}>Plus tard</Text>
+            </Pressable>
+            <Pressable style={[s.modalBtn, { backgroundColor: '#2563EB' }]} onPress={onInstall}>
+              <Text style={[s.modalBtnText, { color: '#FFFFFF' }]}>Installer</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
