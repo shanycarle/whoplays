@@ -36,6 +36,9 @@ jobs:
           PUBLIC_URL: /${{ github.event.repository.name }}/
         run: npx expo export --platform web --output-dir web-build
 
+      - name: Ensure Pages fallback
+        run: cp public/404.html web-build/404.html
+
       - name: Add .nojekyll
         run: touch web-build/.nojekyll
 
@@ -43,6 +46,7 @@ jobs:
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
           publish_dir: ./web-build
           force_orphan: true
           enable_jekyll: false
