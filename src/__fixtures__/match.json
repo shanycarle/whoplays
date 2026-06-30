@@ -1,0 +1,101 @@
+{
+  "id": 101,
+  "status": "live",
+  "starts_at": "2026-06-22T19:00:00Z",
+  "ends_at": null,
+  "sport": "football",
+  "sport_label": "Football",
+  "home_score": 2,
+  "away_score": 1,
+  "field": {
+    "id": 201,
+    "name": "Stade Municipal",
+    "address": "123 Rue du Sport, Montréal",
+    "region": "Île-de-Montréal",
+    "city": "Montréal",
+    "venue_type": "stadium",
+    "venue_type_label": "Stade",
+    "surface_number": 1,
+    "surface_label": "Terrain Principal",
+    "sport_type": "football",
+    "sports": [
+      { "key": "football", "label": "Football" }
+    ],
+    "latitude": 45.5,
+    "longitude": -73.55,
+    "detection_radius_m": 500,
+    "distance_m": 150
+  },
+  "home_team": {
+    "id": 1,
+    "name": "SSJ Blancs",
+    "category": "Senior",
+    "division": "Division 1",
+    "logo_path": null,
+    "color_primary": "#FFFFFF",
+    "color_secondary": "#000000",
+    "sport": "football",
+    "sport_label": "Football"
+  },
+  "away_team": {
+    "id": 2,
+    "name": "SSJ Verts",
+    "category": "Senior",
+    "division": "Division 1",
+    "logo_path": null,
+    "color_primary": "#00AA00",
+    "color_secondary": "#FFFFFF",
+    "sport": "football",
+    "sport_label": "Football"
+  },
+  "lineups": [
+    {
+      "id": 1,
+      "team": {
+        "id": 1,
+        "name": "SSJ Blancs",
+        "color_primary": "#FFFFFF",
+        "color_secondary": "#000000"
+      },
+      "formation": "4-3-3",
+      "published_at": "2026-06-22T18:45:00Z",
+      "entries": [
+        { "player_id": 1, "full_name": "Marc Dupont", "jersey_number": 1, "position": "Gardien", "is_starter": true },
+        { "player_id": 2, "full_name": "Pierre Bernard", "jersey_number": 2, "position": "Arrière Droit", "is_starter": true },
+        { "player_id": 3, "full_name": "Jean Martin", "jersey_number": 3, "position": "Arrière Gauche", "is_starter": true },
+        { "player_id": 4, "full_name": "Claude Lefebvre", "jersey_number": 4, "position": "Défenseur Central", "is_starter": true },
+        { "player_id": 5, "full_name": "Michel Garcia", "jersey_number": 5, "position": "Défenseur Central", "is_starter": true },
+        { "player_id": 6, "full_name": "François Moreau", "jersey_number": 6, "position": "Milieu Défensif", "is_starter": true },
+        { "player_id": 8, "full_name": "Luc Petit", "jersey_number": 8, "position": "Milieu", "is_starter": true },
+        { "player_id": 10, "full_name": "Philippe Dubois", "jersey_number": 10, "position": "Meneur de jeu", "is_starter": true },
+        { "player_id": 7, "full_name": "André Thomas", "jersey_number": 7, "position": "Ailier", "is_starter": true },
+        { "player_id": 9, "full_name": "Robert Richard", "jersey_number": 9, "position": "Attaquant", "is_starter": true },
+        { "player_id": 11, "full_name": "Serge Lefevre", "jersey_number": 11, "position": "Ailier", "is_starter": true }
+      ]
+    },
+    {
+      "id": 2,
+      "team": {
+        "id": 2,
+        "name": "SSJ Verts",
+        "color_primary": "#00AA00",
+        "color_secondary": "#FFFFFF"
+      },
+      "formation": "4-2-3-1",
+      "published_at": "2026-06-22T18:45:00Z",
+      "entries": [
+        { "player_id": 12, "full_name": "Alain Rossi", "jersey_number": 1, "position": "Gardien", "is_starter": true },
+        { "player_id": 13, "full_name": "Didier Bertrand", "jersey_number": 2, "position": "Arrière Droit", "is_starter": true },
+        { "player_id": 14, "full_name": "Eric Fournier", "jersey_number": 3, "position": "Arrière Gauche", "is_starter": true },
+        { "player_id": 15, "full_name": "Georges Mercier", "jersey_number": 4, "position": "Défenseur Central", "is_starter": true },
+        { "player_id": 16, "full_name": "Henri Arnaud", "jersey_number": 5, "position": "Défenseur Central", "is_starter": true },
+        { "player_id": 17, "full_name": "Olivier Fontaine", "jersey_number": 6, "position": "Milieu Défensif", "is_starter": true },
+        { "player_id": 19, "full_name": "Raymond Chevalier", "jersey_number": 8, "position": "Milieu", "is_starter": true },
+        { "player_id": 18, "full_name": "Patrick Caron", "jersey_number": 7, "position": "Ailier", "is_starter": true },
+        { "player_id": 21, "full_name": "Yves Brun", "jersey_number": 10, "position": "Meneur de jeu", "is_starter": true },
+        { "player_id": 20, "full_name": "Thierry Leclerc", "jersey_number": 9, "position": "Attaquant", "is_starter": true },
+        { "player_id": 22, "full_name": "Xavier Vincent", "jersey_number": 11, "position": "Ailier", "is_starter": true }
+      ]
+    }
+  ]
+}

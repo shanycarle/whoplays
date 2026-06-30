@@ -1,0 +1,228 @@
+{
+  "ssj_blancs": {
+    "id": 1,
+    "name": "SSJ Blancs",
+    "category": "Senior",
+    "division": "Division 1",
+    "logo_path": null,
+    "color_primary": "#FFFFFF",
+    "color_secondary": "#000000",
+    "sport": "football",
+    "sport_label": "Football",
+    "players_count": 11,
+    "players": [
+      {
+        "id": 1,
+        "first_name": "Marc",
+        "last_name": "Dupont",
+        "full_name": "Marc Dupont",
+        "photo_path": null,
+        "jersey_number": 1,
+        "position": "Gardien"
+      },
+      {
+        "id": 2,
+        "first_name": "Pierre",
+        "last_name": "Bernard",
+        "full_name": "Pierre Bernard",
+        "photo_path": null,
+        "jersey_number": 2,
+        "position": "Arrière Droit"
+      },
+      {
+        "id": 3,
+        "first_name": "Jean",
+        "last_name": "Martin",
+        "full_name": "Jean Martin",
+        "photo_path": null,
+        "jersey_number": 3,
+        "position": "Arrière Gauche"
+      },
+      {
+        "id": 4,
+        "first_name": "Claude",
+        "last_name": "Lefebvre",
+        "full_name": "Claude Lefebvre",
+        "photo_path": null,
+        "jersey_number": 4,
+        "position": "Défenseur Central"
+      },
+      {
+        "id": 5,
+        "first_name": "Michel",
+        "last_name": "Garcia",
+        "full_name": "Michel Garcia",
+        "photo_path": null,
+        "jersey_number": 5,
+        "position": "Défenseur Central"
+      },
+      {
+        "id": 6,
+        "first_name": "François",
+        "last_name": "Moreau",
+        "full_name": "François Moreau",
+        "photo_path": null,
+        "jersey_number": 6,
+        "position": "Milieu Défensif"
+      },
+      {
+        "id": 7,
+        "first_name": "André",
+        "last_name": "Thomas",
+        "full_name": "André Thomas",
+        "photo_path": null,
+        "jersey_number": 7,
+        "position": "Ailier"
+      },
+      {
+        "id": 8,
+        "first_name": "Luc",
+        "last_name": "Petit",
+        "full_name": "Luc Petit",
+        "photo_path": null,
+        "jersey_number": 8,
+        "position": "Milieu"
+      },
+      {
+        "id": 9,
+        "first_name": "Robert",
+        "last_name": "Richard",
+        "full_name": "Robert Richard",
+        "photo_path": null,
+        "jersey_number": 9,
+        "position": "Attaquant"
+      },
+      {
+        "id": 10,
+        "first_name": "Philippe",
+        "last_name": "Dubois",
+        "full_name": "Philippe Dubois",
+        "photo_path": null,
+        "jersey_number": 10,
+        "position": "Meneur de jeu"
+      },
+      {
+        "id": 11,
+        "first_name": "Serge",
+        "last_name": "Lefevre",
+        "full_name": "Serge Lefevre",
+        "photo_path": null,
+        "jersey_number": 11,
+        "position": "Ailier"
+      }
+    ]
+  },
+  "ssj_verts": {
+    "id": 2,
+    "name": "SSJ Verts",
+    "category": "Senior",
+    "division": "Division 1",
+    "logo_path": null,
+    "color_primary": "#00AA00",
+    "color_secondary": "#FFFFFF",
+    "sport": "football",
+    "sport_label": "Football",
+    "players_count": 11,
+    "players": [
+      {
+        "id": 12,
+        "first_name": "Alain",
+        "last_name": "Rossi",
+        "full_name": "Alain Rossi",
+        "photo_path": null,
+        "jersey_number": 1,
+        "position": "Gardien"
+      },
+      {
+        "id": 13,
+        "first_name": "Didier",
+        "last_name": "Bertrand",
+        "full_name": "Didier Bertrand",
+        "photo_path": null,
+        "jersey_number": 2,
+        "position": "Arrière Droit"
+      },
+      {
+        "id": 14,
+        "first_name": "Eric",
+        "last_name": "Fournier",
+        "full_name": "Eric Fournier",
+        "photo_path": null,
+        "jersey_number": 3,
+        "position": "Arrière Gauche"
+      },
+      {
+        "id": 15,
+        "first_name": "Georges",
+        "last_name": "Mercier",
+        "full_name": "Georges Mercier",
+        "photo_path": null,
+        "jersey_number": 4,
+        "position": "Défenseur Central"
+      },
+      {
+        "id": 16,
+        "first_name": "Henri",
+        "last_name": "Arnaud",
+        "full_name": "Henri Arnaud",
+        "photo_path": null,
+        "jersey_number": 5,
+        "position": "Défenseur Central"
+      },
+      {
+        "id": 17,
+        "first_name": "Olivier",
+        "last_name": "Fontaine",
+        "full_name": "Olivier Fontaine",
+        "photo_path": null,
+        "jersey_number": 6,
+        "position": "Milieu Défensif"
+      },
+      {
+        "id": 18,
+        "first_name": "Patrick",
+        "last_name": "Caron",
+        "full_name": "Patrick Caron",
+        "photo_path": null,
+        "jersey_number": 7,
+        "position": "Ailier"
+      },
+      {
+        "id": 19,
+        "first_name": "Raymond",
+        "last_name": "Chevalier",
+        "full_name": "Raymond Chevalier",
+        "photo_path": null,
+        "jersey_number": 8,
+        "position": "Milieu"
+      },
+      {
+        "id": 20,
+        "first_name": "Thierry",
+        "last_name": "Leclerc",
+        "full_name": "Thierry Leclerc",
+        "photo_path": null,
+        "jersey_number": 9,
+        "position": "Attaquant"
+      },
+      {
+        "id": 21,
+        "first_name": "Yves",
+        "last_name": "Brun",
+        "full_name": "Yves Brun",
+        "photo_path": null,
+        "jersey_number": 10,
+        "position": "Meneur de jeu"
+      },
+      {
+        "id": 22,
+        "first_name": "Xavier",
+        "last_name": "Vincent",
+        "full_name": "Xavier Vincent",
+        "photo_path": null,
+        "jersey_number": 11,
+        "position": "Ailier"
+      }
+    ]
+  }
+}

@@ -19,7 +19,23 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
-    }
+      "favicon": "./assets/favicon.png",
+      "display": "standalone",
+      "scope": "/",
+      "startUrl": "/",
+      "orientation": "portrait-primary",
+      "themeColor": "#1F2937",
+      "backgroundColor": "#FFFFFF",
+      "shortName": "WhoPlays",
+      "categories": ["sports", "utilities"]
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "WhoPlays utilise ta position pour trouver le terrain et le match autour de toi."
+        }
+      ]
+    ]
   }
 }

@@ -1,0 +1,63 @@
+{
+  "field": {
+    "id": 201,
+    "name": "Stade Municipal",
+    "address": "123 Rue du Sport, Montréal",
+    "region": "Île-de-Montréal",
+    "city": "Montréal",
+    "venue_type": "stadium",
+    "venue_type_label": "Stade",
+    "surface_number": 1,
+    "surface_label": "Terrain Principal",
+    "sport_type": "football",
+    "sports": [
+      { "key": "football", "label": "Football" }
+    ],
+    "latitude": 45.5,
+    "longitude": -73.55,
+    "detection_radius_m": 500,
+    "distance_m": 150
+  },
+  "active_match": {
+    "id": 101,
+    "status": "live",
+    "starts_at": "2026-06-22T19:00:00Z",
+    "ends_at": null,
+    "sport": "football",
+    "sport_label": "Football",
+    "home_score": 2,
+    "away_score": 1,
+    "home_team": {
+      "id": 1,
+      "name": "SSJ Blancs",
+      "color_primary": "#FFFFFF",
+      "color_secondary": "#000000"
+    },
+    "away_team": {
+      "id": 2,
+      "name": "SSJ Verts",
+      "color_primary": "#00AA00",
+      "color_secondary": "#FFFFFF"
+    }
+  },
+  "next_match": null,
+  "schedule": [
+    {
+      "id": 101,
+      "status": "live",
+      "starts_at": "2026-06-22T19:00:00Z",
+      "sport": "football",
+      "sport_label": "Football",
+      "home_score": 2,
+      "away_score": 1,
+      "home_team": {
+        "id": 1,
+        "name": "SSJ Blancs"
+      },
+      "away_team": {
+        "id": 2,
+        "name": "SSJ Verts"
+      }
+    }
+  ]
+}
