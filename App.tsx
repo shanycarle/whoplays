@@ -213,10 +213,14 @@ function Root() {
     const isStandalone = win.matchMedia?.('(display-mode: standalone)').matches || Boolean((win.navigator as Navigator & { standalone?: boolean }).standalone);
     if (isStandalone) return;
 
+    const showInstallPrompt = () => {
+      setInstallPromptVisible(true);
+    };
+
     const handleBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
       installPromptRef.current = event;
-      setInstallPromptVisible(true);
+      showInstallPrompt();
     };
 
     const handleAppInstalled = () => {
@@ -224,7 +228,7 @@ function Root() {
       setInstallPromptVisible(false);
     };
 
-    const timer = window.setTimeout(() => setInstallPromptVisible(true), 1200);
+    const timer = window.setTimeout(showInstallPrompt, 1400);
 
     win.addEventListener?.('beforeinstallprompt', handleBeforeInstallPrompt as EventListener);
     win.addEventListener?.('appinstalled', handleAppInstalled as EventListener);
@@ -240,6 +244,9 @@ function Root() {
     const event = installPromptRef.current;
     if (!event) {
       setInstallPromptVisible(false);
+      if (typeof window !== 'undefined') {
+        window.open('https://support.google.com/chrome/answer/9658361?hl=fr', '_blank', 'noopener,noreferrer');
+      }
       return;
     }
 
