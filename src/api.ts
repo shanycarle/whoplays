@@ -199,15 +199,25 @@ const MOCK_TEAM_VERTS: Team = {
   ],
 };
 
-const MOCK_MATCH: Match = {
+const MOCK_JUNIORS_TEAM_BLANCS: Team = {
+  ...MOCK_TEAM_BLANCS,
+  category: 'Juniors',
+};
+
+const MOCK_JUNIORS_TEAM_VERTS: Team = {
+  ...MOCK_TEAM_VERTS,
+  category: 'Juniors',
+};
+
+const MOCK_JUNIORS_MATCH: Match = {
   id: 101,
   status: 'live',
-  starts_at: '2026-06-22T19:00:00Z',
+  starts_at: '2026-07-03T13:00:00Z',
   ends_at: null,
   sport: 'football',
   sport_label: 'Football',
-  home_score: 2,
-  away_score: 1,
+  home_score: 0,
+  away_score: 0,
   field: {
     id: 201,
     name: 'Stade Gilles-Doucet',
@@ -231,14 +241,14 @@ const MOCK_MATCH: Match = {
       'https://picsum.photos/seed/gilles-doucet/500/300',
     ],
   },
-  home_team: MOCK_TEAM_BLANCS,
-  away_team: MOCK_TEAM_VERTS,
+  home_team: MOCK_JUNIORS_TEAM_BLANCS,
+  away_team: MOCK_JUNIORS_TEAM_VERTS,
   lineups: [
     {
       id: 1,
-      team: { id: 1, name: 'SSJ Blancs', category: null, division: null, logo_path: null, color_primary: '#FFFFFF', color_secondary: '#000000' },
+      team: { id: 1, name: 'SSJ Blancs', category: 'Juniors', division: null, logo_path: null, color_primary: '#FFFFFF', color_secondary: '#000000' },
       formation: '4-3-3',
-      published_at: '2026-06-22T18:45:00Z',
+      published_at: '2026-07-03T12:45:00Z',
       entries: [
         { player_id: 1, full_name: 'Marc Dupont', jersey_number: 1, position: 'Gardien', is_starter: true },
         { player_id: 2, full_name: 'Pierre Bernard', jersey_number: 2, position: 'Arrière Droit', is_starter: true },
@@ -255,9 +265,9 @@ const MOCK_MATCH: Match = {
     },
     {
       id: 2,
-      team: { id: 2, name: 'SSJ Verts', category: null, division: null, logo_path: null, color_primary: '#00AA00', color_secondary: '#FFFFFF' },
+      team: { id: 2, name: 'SSJ Verts', category: 'Juniors', division: null, logo_path: null, color_primary: '#00AA00', color_secondary: '#FFFFFF' },
       formation: '4-2-3-1',
-      published_at: '2026-06-22T18:45:00Z',
+      published_at: '2026-07-03T12:45:00Z',
       entries: [
         { player_id: 12, full_name: 'Alain Rossi', jersey_number: 1, position: 'Gardien', is_starter: true },
         { player_id: 13, full_name: 'Didier Bertrand', jersey_number: 2, position: 'Arrière Droit', is_starter: true },
@@ -275,11 +285,28 @@ const MOCK_MATCH: Match = {
   ],
 };
 
+const MOCK_SENIORS_MATCH: Match = {
+  id: 102,
+  status: 'scheduled',
+  starts_at: '2026-07-03T14:30:00Z',
+  ends_at: null,
+  sport: 'football',
+  sport_label: 'Football',
+  home_score: null,
+  away_score: null,
+  field: MOCK_JUNIORS_MATCH.field,
+  home_team: MOCK_TEAM_BLANCS,
+  away_team: MOCK_TEAM_VERTS,
+  lineups: MOCK_JUNIORS_MATCH.lineups,
+};
+
+const MATCHES = [MOCK_JUNIORS_MATCH, MOCK_SENIORS_MATCH];
+
 const MOCK_GEO_RESULT: GeoResolveResult = {
-  field: MOCK_MATCH.field,
-  active_match: MOCK_MATCH,
-  next_match: null,
-  schedule: [MOCK_MATCH],
+  field: MOCK_JUNIORS_MATCH.field,
+  active_match: MOCK_JUNIORS_MATCH,
+  next_match: MOCK_SENIORS_MATCH,
+  schedule: [MOCK_JUNIORS_MATCH, MOCK_SENIORS_MATCH],
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -332,7 +359,7 @@ export async function findPlayerByNumber(
   number: number,
 ): Promise<PlayerHit[]> {
   if (USE_MOCK_DATA) {
-    const match = MOCK_MATCH;
+    const match = MATCHES.find((m) => m.id === matchId) ?? MATCHES[0];
     const searchStr = String(number);
     const hits: PlayerHit[] = [];
 
@@ -373,37 +400,36 @@ export async function findPlayerByNumber(
 /** GET /players/{id} — full profile for the zoom popup. */
 export async function getPlayer(id: number): Promise<PlayerProfile> {
   if (USE_MOCK_DATA) {
-    const match = MOCK_MATCH;
-    
-    // Search in all lineups
-    if (match.lineups) {
-      for (const lineup of match.lineups) {
-        if (lineup.entries) {
-          const entry = lineup.entries.find(e => e.player_id === id);
-          if (entry) {
-            return {
-              id,
-              full_name: entry.full_name,
-              photo_path: null,
-              team: lineup.team?.name ?? null,
-              position: entry.position,
-              jersey_number: entry.jersey_number,
-              numbers: entry.jersey_number ? [entry.jersey_number] : [],
-              age: 28,
-              birthdate: '1998-01-01',
-              school_year: null,
-              side: 'Droit',
-              height_cm: 180,
-              weight_kg: 80,
-              build: 'Athlétique',
-              discipline: 'Football',
-              hometown: 'Montréal',
-            };
+    for (const match of MATCHES) {
+      if (match.lineups) {
+        for (const lineup of match.lineups) {
+          if (lineup.entries) {
+            const entry = lineup.entries.find((e) => e.player_id === id);
+            if (entry) {
+              return {
+                id,
+                full_name: entry.full_name,
+                photo_path: null,
+                team: lineup.team?.name ?? null,
+                position: entry.position,
+                jersey_number: entry.jersey_number,
+                numbers: entry.jersey_number ? [entry.jersey_number] : [],
+                age: 28,
+                birthdate: '1998-01-01',
+                school_year: null,
+                side: 'Droit',
+                height_cm: 180,
+                weight_kg: 80,
+                build: 'Athlétique',
+                discipline: 'Football',
+                hometown: 'Montréal',
+              };
+            }
           }
         }
       }
     }
-    
+
     // Default fallback
     return {
       id,
