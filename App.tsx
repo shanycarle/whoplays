@@ -87,6 +87,7 @@ function Root() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [installPromptVisible, setInstallPromptVisible] = useState(false);
   const installPromptRef = useRef<any>(null);
+  const [selectedField, setSelectedField] = useState<Field | null>(null);
   const triedDemo = useRef(false);
 
   // Player zoom popup
@@ -348,13 +349,19 @@ function Root() {
 
           <View style={s.locationRow}>
             <Ionicons name="location-sharp" size={16} color={t.secondary} />
-            <Text style={s.locationText} numberOfLines={1}>
-              {phase === 'ready'
-                ? geo?.field?.name ?? tr('noFieldNearby')
-                : phase === 'error'
-                ? tr('locationUnavailable')
-                : tr('locating')}
-            </Text>
+            <Pressable
+              onPress={() => geo?.field && setSelectedField(geo.field)}
+              style={{ flex: 1 }}
+              hitSlop={8}
+            >
+              <Text style={s.locationText} numberOfLines={1}>
+                {phase === 'ready'
+                  ? geo?.field?.name ?? tr('noFieldNearby')
+                  : phase === 'error'
+                  ? tr('locationUnavailable')
+                  : tr('locating')}
+              </Text>
+            </Pressable>
             <Pressable onPress={() => locate()} hitSlop={8} style={s.changeBtn}>
               <Ionicons name="locate" size={15} color={t.secondary} />
               <Text style={s.changeText}>{tr('change')}</Text>
@@ -950,7 +957,11 @@ function FieldsScreen({ t, s }: { t: Theme; s: Styles }) {
             {sport ? ` · ${SPORTS.find((x) => x.key === sport)?.label ?? sport}` : ''}
           </Text>
           {fields.map((f) => (
-            <View key={f.id} style={s.fieldCard}>
+            <Pressable
+              key={f.id}
+              style={({ pressed }) => [s.fieldCard, pressed && { opacity: 0.7 }]}
+              onPress={() => setSelectedField(f)}
+            >
               <View style={s.fieldIcon}>{sportIcon(f.sport_type ?? f.sports[0]?.key ?? null, t.onPrimary)}</View>
               <View style={{ flex: 1 }}>
                 <Text style={s.fieldName} numberOfLines={1}>{f.name}</Text>
@@ -984,7 +995,7 @@ function FieldsScreen({ t, s }: { t: Theme; s: Styles }) {
                   </Text>
                 </View>
               )}
-            </View>
+            </Pressable>
           ))}
         </View>
       ) : (
@@ -1159,9 +1170,9 @@ function ScheduleScreen({
           {groups.map((g) => (
             <View key={g.key} style={{ gap: spacing.sm }}>
               <Text style={s.dayHeader}>{g.label}</Text>
-              {g.matches.map((m) => (
-                <MatchRow key={m.id} t={t} s={s} m={m} />
-              ))}
+                  {g.matches.map((m) => (
+                    <MatchRow key={m.id} t={t} s={s} m={m} onOpenField={(f) => (f ? setSelectedField(f) : null)} />
+                  ))}
             </View>
           ))}
         </View>
@@ -1179,7 +1190,7 @@ function ScheduleScreen({
   );
 }
 
-function MatchRow({ t, s, m }: { t: Theme; s: Styles; m: Match }) {
+function MatchRow({ t, s, m, onOpenField }: { t: Theme; s: Styles; m: Match; onOpenField?: (f: Field | null) => void }) {
   const { tr, lang } = useLang();
   const d = m.starts_at ? new Date(m.starts_at) : null;
   const dist = m.field?.distance_m ?? null;
@@ -1202,10 +1213,12 @@ function MatchRow({ t, s, m }: { t: Theme; s: Styles; m: Match }) {
         {!!badge && <Text style={s.matchSport} numberOfLines={1}>{badge}</Text>}
         <View style={s.matchFieldRow}>
           <Ionicons name="location-sharp" size={12} color={t.muted} />
-          <Text style={s.matchField} numberOfLines={1}>
-            {m.field?.name ?? tr('unknownField')}
-            {dist != null ? ` · ${fmtDist(dist)}` : ''}
-          </Text>
+          <Pressable onPress={() => onOpenField?.(m.field)} style={{ flex: 1 }}>
+            <Text style={s.matchField} numberOfLines={1}>
+              {m.field?.name ?? tr('unknownField')}
+              {dist != null ? ` · ${fmtDist(dist)}` : ''}
+            </Text>
+          </Pressable>
         </View>
       </View>
     </View>
@@ -1374,7 +1387,53 @@ function AlignementsScreen({ t, s }: { t: Theme; s: Styles }) {
         loading={zoomLoading}
         onClose={() => setZoomHit(null)}
       />
+      <FieldDetailModal t={t} s={s} field={selectedField} onClose={() => setSelectedField(null)} />
     </View>
+  );
+}
+
+function FieldDetailModal({ t, s, field, onClose }: { t: Theme; s: Styles; field: Field | null; onClose: () => void }) {
+  const { tr } = useLang();
+  if (!field) return null;
+  return (
+    <Modal visible={!!field} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={s.modalBackdrop}>
+        <View style={[s.modalSheet, { maxHeight: '85%' }]}>
+          <View style={s.modalHandle} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm }}>
+            <View style={[s.crest, { backgroundColor: t.secondary }]}>
+              <Text style={s.crestText}>{initials(field.name)}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.modalTitle} numberOfLines={2}>{field.name}</Text>
+              <Text style={s.placeholderSub}>{[field.city, field.region].filter(Boolean).join(' · ')}</Text>
+            </View>
+            <Pressable onPress={onClose} hitSlop={10}>
+              <Ionicons name="close" size={24} color={t.muted} />
+            </Pressable>
+          </View>
+
+          <ScrollView contentContainerStyle={{ paddingBottom: spacing.md }}>
+            {field.photos && field.photos.length > 0 && (
+              <Image source={{ uri: field.photos[0] }} style={{ width: '100%', height: 180, borderRadius: 8 }} />
+            )}
+
+            <View style={{ paddingTop: spacing.md }}>
+              <Text style={s.sectionTitle}>{tr('description') ?? 'Description'}</Text>
+              <Text style={{ marginTop: spacing.sm, color: t.text }}>{field.description ?? '—'}</Text>
+            </View>
+
+            {field.photos && field.photos.length > 1 && (
+              <View style={{ marginTop: spacing.md, flexDirection: 'row', gap: spacing.sm }}>
+                {field.photos.slice(1).map((p, i) => (
+                  <Image key={i} source={{ uri: p }} style={{ width: 120, height: 80, borderRadius: 6 }} />
+                ))}
+              </View>
+            )}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
   );
 }
 

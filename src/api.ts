@@ -65,6 +65,8 @@ export type Field = {
   longitude: number | null;
   detection_radius_m: number | null;
   distance_m: number | null;
+  description?: string | null;
+  photos?: string[];
 };
 
 export type LineupEntry = {
@@ -208,20 +210,26 @@ const MOCK_MATCH: Match = {
   away_score: 1,
   field: {
     id: 201,
-    name: 'Stade Municipal',
-    address: '123 Rue du Sport, Montréal',
-    region: 'Île-de-Montréal',
-    city: 'Montréal',
+    name: 'Stade Gilles-Doucet',
+    address: '858, rue Laviolette, Trois-Rivières',
+    region: 'Mauricie',
+    city: 'Trois-Rivières',
     venue_type: 'stadium',
     venue_type_label: 'Stade',
     surface_number: 1,
-    surface_label: 'Terrain Principal',
+    surface_label: 'Gazon synthétique',
     sport_type: 'football',
     sports: [{ key: 'football', label: 'Football' }],
-    latitude: 45.5,
-    longitude: -73.55,
+    latitude: 46.348793,
+    longitude: -72.5437084,
     detection_radius_m: 500,
     distance_m: 150,
+    description:
+      'Le Stade Gilles-Doucet est le terrain de football du Séminaire Saint-Joseph de Trois-Rivières, situé au 858, rue Laviolette. Inauguré en 2010, il dispose d’un terrain en gazon synthétique, d’un éclairage de qualité pour les soirées et de gradins pouvant accueillir plus de 1 000 spectateurs. Il porte le nom de Gilles Doucet, entraîneur-chef pendant 28 ans, qui a formé plus de 1 200 joueurs et contribué à faire du programme de football du Séminaire une référence régionale.',
+    photos: [
+      'https://picsum.photos/seed/stade-gilles-doucet/900/450',
+      'https://picsum.photos/seed/gilles-doucet/500/300',
+    ],
   },
   home_team: MOCK_TEAM_BLANCS,
   away_team: MOCK_TEAM_VERTS,
