@@ -202,7 +202,7 @@ const MOCK_SENIORS_TEAM_PATS: Team = {
 const MOCK_JUNIORS_MATCH: Match = {
   id: 101,
   status: 'scheduled',
-  starts_at: '2026-07-03T13:00:00Z',
+  starts_at: '2026-07-03T16:00:00Z', // 12:00 (midi) heure de Trois-Rivières (EDT)
   ends_at: null,
   sport: 'football',
   sport_label: 'Football',
@@ -329,7 +329,7 @@ const MOCK_JUNIORS_MATCH: Match = {
 const MOCK_SENIORS_MATCH: Match = {
   id: 102,
   status: 'scheduled',
-  starts_at: '2026-07-03T14:30:00Z',
+  starts_at: '2026-07-03T17:30:00Z', // 13:30 heure de Trois-Rivières (EDT)
   ends_at: null,
   sport: 'football',
   sport_label: 'Football',

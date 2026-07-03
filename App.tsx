@@ -1162,6 +1162,7 @@ function ScheduleScreen({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedField, setSelectedField] = useState<Field | null>(null);
+  const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const reqId = useRef(0);
 
   useEffect(() => {
@@ -1237,7 +1238,7 @@ function ScheduleScreen({
             <View key={g.key} style={{ gap: spacing.sm }}>
               <Text style={s.dayHeader}>{g.label}</Text>
                   {g.matches.map((m) => (
-                    <MatchRow key={m.id} t={t} s={s} m={m} onOpenField={(f) => (f ? setSelectedField(f) : null)} />
+                    <MatchRow key={m.id} t={t} s={s} m={m} onOpen={setSelectedMatch} />
                   ))}
             </View>
           ))}
@@ -1253,18 +1254,31 @@ function ScheduleScreen({
         </View>
       )}
 
+      <MatchDetailModal
+        t={t}
+        s={s}
+        matches={matches ?? []}
+        match={selectedMatch}
+        onSelect={setSelectedMatch}
+        onClose={() => setSelectedMatch(null)}
+        onOpenField={(f) => (f ? setSelectedField(f) : null)}
+      />
+
       <FieldDetailModal t={t} s={s} field={selectedField} onClose={() => setSelectedField(null)} />
     </View>
   );
 }
 
-function MatchRow({ t, s, m, onOpenField }: { t: Theme; s: Styles; m: Match; onOpenField?: (f: Field | null) => void }) {
+function MatchRow({ t, s, m, onOpen }: { t: Theme; s: Styles; m: Match; onOpen?: (m: Match) => void }) {
   const { tr, lang } = useLang();
   const d = m.starts_at ? new Date(m.starts_at) : null;
   const dist = m.field?.distance_m ?? null;
   const badge = [m.sport_label, m.home_team?.category].filter(Boolean).join(' · ');
   return (
-    <View style={s.matchRow}>
+    <Pressable
+      style={({ pressed }) => [s.matchRow, pressed && { opacity: 0.7 }]}
+      onPress={() => onOpen?.(m)}
+    >
       <View style={s.matchTimeCol}>
         {sportIcon(m.sport, t.primary, 18)}
         <Text style={s.matchTimeText}>{d ? fmtTime(d, lang) : '--'}</Text>
@@ -1281,15 +1295,106 @@ function MatchRow({ t, s, m, onOpenField }: { t: Theme; s: Styles; m: Match; onO
         {!!badge && <Text style={s.matchSport} numberOfLines={1}>{badge}</Text>}
         <View style={s.matchFieldRow}>
           <Ionicons name="location-sharp" size={12} color={t.muted} />
-          <Pressable onPress={() => onOpenField?.(m.field ?? null)} style={{ flex: 1 }}>
-            <Text style={s.matchField} numberOfLines={1}>
-              {m.field?.name ?? tr('unknownField')}
-              {dist != null ? ` · ${fmtDist(dist)}` : ''}
-            </Text>
-          </Pressable>
+          <Text style={s.matchField} numberOfLines={1}>
+            {m.field?.name ?? tr('unknownField')}
+            {dist != null ? ` · ${fmtDist(dist)}` : ''}
+          </Text>
         </View>
       </View>
+      <Ionicons name="chevron-forward" size={18} color={t.muted} />
+    </Pressable>
+  );
+}
+
+// Match detail sheet: shows one game and lets you flip between the day's games
+// (e.g. Juniors ↔ Senior) via the chips at the top.
+function MatchDetailModal({
+  t,
+  s,
+  matches,
+  match,
+  onSelect,
+  onClose,
+  onOpenField,
+}: {
+  t: Theme;
+  s: Styles;
+  matches: Match[];
+  match: Match | null;
+  onSelect: (m: Match) => void;
+  onClose: () => void;
+  onOpenField: (f: Field | null) => void;
+}) {
+  const { tr, lang } = useLang();
+  if (!match) return null;
+  const d = match.starts_at ? new Date(match.starts_at) : null;
+  const home = match.home_team;
+  const away = match.away_team;
+  const catBadge = [match.sport_label, home?.category].filter(Boolean).join(' · ');
+
+  const TeamCol = ({ team }: { team: Team | null | undefined }) => (
+    <View style={{ alignItems: 'center', flex: 1, gap: spacing.sm }}>
+      <View style={[s.crest, { backgroundColor: team?.color_primary ?? t.secondary, width: 56, height: 56, borderRadius: 28 }]}>
+        <Text style={s.crestText}>{initials(team?.name ?? '?')}</Text>
+      </View>
+      <Text style={[s.matchTeams, { textAlign: 'center' }]} numberOfLines={2}>{team?.name ?? '?'}</Text>
     </View>
+  );
+
+  return (
+    <Modal visible={!!match} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={s.modalBackdrop}>
+        <View style={[s.modalSheet, { maxHeight: '85%' }]}>
+          <View style={s.modalHandle} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
+            <Text style={[s.modalTitle, { flex: 1 }]}>{lang === 'fr' ? 'Partie' : 'Match'}</Text>
+            <Pressable onPress={onClose} hitSlop={10}>
+              <Ionicons name="close" size={24} color={t.muted} />
+            </Pressable>
+          </View>
+
+          {matches.length > 1 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm, paddingVertical: 2 }}>
+              {matches.map((mm) => {
+                const md = mm.starts_at ? new Date(mm.starts_at) : null;
+                const label = `${mm.home_team?.category ?? mm.sport_label ?? ''}${md ? ` · ${fmtTime(md, lang)}` : ''}`;
+                return (
+                  <RegionChip key={mm.id} t={t} s={s} label={label} active={mm.id === match.id} onPress={() => onSelect(mm)} />
+                );
+              })}
+            </ScrollView>
+          )}
+
+          <ScrollView contentContainerStyle={{ paddingBottom: spacing.md }}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'center', gap: spacing.md, marginTop: spacing.lg }}>
+              <TeamCol team={home} />
+              <Text style={[s.vsSmall, { fontSize: 18, marginTop: spacing.lg }]}>VS</Text>
+              <TeamCol team={away} />
+            </View>
+
+            <View style={{ marginTop: spacing.lg, gap: spacing.sm }}>
+              <View style={s.fieldDetailRow}>
+                <Ionicons name="time-outline" size={16} color={t.secondary} />
+                <Text style={s.fieldDetailText}>{d ? fmtTime(d, lang) : '--'}</Text>
+              </View>
+              {!!catBadge && (
+                <View style={s.fieldDetailRow}>
+                  {sportIcon(match.sport, t.secondary, 16)}
+                  <Text style={s.fieldDetailText}>{catBadge}</Text>
+                </View>
+              )}
+              <Pressable style={s.fieldDetailRow} onPress={() => onOpenField(match.field ?? null)}>
+                <Ionicons name="location-sharp" size={16} color={t.secondary} />
+                <Text style={[s.fieldDetailText, { flex: 1, textDecorationLine: 'underline' }]} numberOfLines={1}>
+                  {match.field?.name ?? tr('unknownField')}
+                </Text>
+                <Ionicons name="chevron-forward" size={16} color={t.muted} />
+              </Pressable>
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
