@@ -1,0 +1,26 @@
+{
+  "name": "WhoPlays",
+  "short_name": "WhoPlays",
+  "description": "Trouve les joueurs par numéro et rejoins les matchs près de toi",
+  "start_url": "/WhoPlays/",
+  "scope": "/WhoPlays/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#1F2937",
+  "background_color": "#FFFFFF",
+  "categories": ["sports", "utilities"],
+  "icons": [
+    {
+      "src": "/WhoPlays/favicon.ico",
+      "sizes": "192x192",
+      "type": "image/x-icon",
+      "purpose": "any"
+    },
+    {
+      "src": "/WhoPlays/favicon.ico",
+      "sizes": "512x512",
+      "type": "image/x-icon",
+      "purpose": "maskable"
+    }
+  ]
+}

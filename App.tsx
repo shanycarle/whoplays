@@ -448,6 +448,8 @@ function Root() {
         onClose={() => setSelected(null)}
       />
 
+      <FieldDetailModal t={t} s={s} field={selectedField} onClose={() => setSelectedField(null)} />
+
       <InstallPwaPrompt
         visible={installPromptVisible}
         onClose={() => setInstallPromptVisible(false)}
@@ -855,6 +857,7 @@ function FieldsScreen({ t, s }: { t: Theme; s: Styles }) {
   const [fields, setFields] = useState<Field[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedField, setSelectedField] = useState<Field | null>(null);
   const reqId = useRef(0);
 
   // Region chips (loaded once).
@@ -1007,6 +1010,8 @@ function FieldsScreen({ t, s }: { t: Theme; s: Styles }) {
           </Text>
         </View>
       )}
+
+      <FieldDetailModal t={t} s={s} field={selectedField} onClose={() => setSelectedField(null)} />
     </View>
   );
 }
@@ -1096,6 +1101,7 @@ function ScheduleScreen({
   const [matches, setMatches] = useState<Match[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedField, setSelectedField] = useState<Field | null>(null);
   const reqId = useRef(0);
 
   useEffect(() => {
@@ -1186,6 +1192,8 @@ function ScheduleScreen({
           </Text>
         </View>
       )}
+
+      <FieldDetailModal t={t} s={s} field={selectedField} onClose={() => setSelectedField(null)} />
     </View>
   );
 }
@@ -1213,7 +1221,7 @@ function MatchRow({ t, s, m, onOpenField }: { t: Theme; s: Styles; m: Match; onO
         {!!badge && <Text style={s.matchSport} numberOfLines={1}>{badge}</Text>}
         <View style={s.matchFieldRow}>
           <Ionicons name="location-sharp" size={12} color={t.muted} />
-          <Pressable onPress={() => onOpenField?.(m.field)} style={{ flex: 1 }}>
+          <Pressable onPress={() => onOpenField?.(m.field ?? null)} style={{ flex: 1 }}>
             <Text style={s.matchField} numberOfLines={1}>
               {m.field?.name ?? tr('unknownField')}
               {dist != null ? ` · ${fmtDist(dist)}` : ''}
@@ -1387,7 +1395,6 @@ function AlignementsScreen({ t, s }: { t: Theme; s: Styles }) {
         loading={zoomLoading}
         onClose={() => setZoomHit(null)}
       />
-      <FieldDetailModal t={t} s={s} field={selectedField} onClose={() => setSelectedField(null)} />
     </View>
   );
 }
@@ -1417,6 +1424,27 @@ function FieldDetailModal({ t, s, field, onClose }: { t: Theme; s: Styles; field
             {field.photos && field.photos.length > 0 && (
               <Image source={{ uri: field.photos[0] }} style={{ width: '100%', height: 180, borderRadius: 8 }} />
             )}
+
+            <View style={{ paddingTop: spacing.md, gap: spacing.sm }}>
+              {field.address ? (
+                <View style={s.fieldDetailRow}>
+                  <Ionicons name="location-sharp" size={16} color={t.secondary} />
+                  <Text style={s.fieldDetailText}>{field.address}</Text>
+                </View>
+              ) : null}
+              {field.venue_type_label ? (
+                <View style={s.fieldDetailRow}>
+                  <MaterialCommunityIcons name="soccer-field" size={16} color={t.secondary} />
+                  <Text style={s.fieldDetailText}>{field.venue_type_label}</Text>
+                </View>
+              ) : null}
+              {field.surface_label ? (
+                <View style={s.fieldDetailRow}>
+                  <MaterialCommunityIcons name="grass" size={16} color={t.secondary} />
+                  <Text style={s.fieldDetailText}>{field.surface_label}</Text>
+                </View>
+              ) : null}
+            </View>
 
             <View style={{ paddingTop: spacing.md }}>
               <Text style={s.sectionTitle}>{tr('description') ?? 'Description'}</Text>
@@ -2016,7 +2044,7 @@ function makeStyles(t: Theme) {
       flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
       borderRadius: radius.md, padding: spacing.md, marginVertical: spacing.md,
     },
-    previewText: { fontSize: 18, fontWeight: '900' },
+    previewText: { fontSize: 18, fontWeight: '900', color: t.text },
     previewChip: { marginLeft: 'auto', width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
     swatchLabel: { color: t.text, fontSize: 14, fontWeight: '800', marginTop: spacing.md, marginBottom: spacing.sm },
     swatchGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
@@ -2082,5 +2110,7 @@ function makeStyles(t: Theme) {
     infoLabel: { color: t.muted, fontSize: 10, fontWeight: '700', letterSpacing: 0.4 },
     infoValue: { color: t.text, fontSize: 15, fontWeight: '700', marginTop: 2 },
     infoSub: { color: t.muted, fontSize: 12, marginTop: 1 },
+    fieldDetailRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
+    fieldDetailText: { color: t.text, fontSize: 13, lineHeight: 18 },
   });
 }

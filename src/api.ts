@@ -474,7 +474,7 @@ const MOCK_SENIORS_MATCH: Match = {
 const MATCHES = [MOCK_JUNIORS_MATCH, MOCK_SENIORS_MATCH];
 
 const MOCK_GEO_RESULT: GeoResolveResult = {
-  field: MOCK_JUNIORS_MATCH.field,
+  field: MOCK_JUNIORS_MATCH.field ?? null,
   active_match: MOCK_JUNIORS_MATCH,
   next_match: MOCK_SENIORS_MATCH,
   schedule: [MOCK_JUNIORS_MATCH, MOCK_SENIORS_MATCH],
@@ -659,7 +659,20 @@ export async function searchTeams(params?: {
   sport?: string | null;
 }): Promise<Team[]> {
   if (USE_MOCK_DATA) {
-    return [MOCK_TEAM_BLANCS, MOCK_TEAM_VERTS];
+    const allTeams = [
+      MOCK_TEAM_BLANCS,
+      MOCK_TEAM_VERTS,
+      MOCK_JUNIORS_TEAM_BILLS,
+      MOCK_JUNIORS_TEAM_BUCS,
+      MOCK_SENIORS_TEAM_SEAHAWKS,
+      MOCK_SENIORS_TEAM_PATS,
+    ];
+    return allTeams.filter((team) => {
+      if (params?.sport && params.sport !== team.sport) {
+        return false;
+      }
+      return true;
+    });
   }
 
   const qs = new URLSearchParams();
@@ -675,6 +688,10 @@ export async function getTeam(id: number): Promise<Team> {
   if (USE_MOCK_DATA) {
     if (id === 1) return MOCK_TEAM_BLANCS;
     if (id === 2) return MOCK_TEAM_VERTS;
+    if (id === 3) return MOCK_JUNIORS_TEAM_BILLS;
+    if (id === 4) return MOCK_JUNIORS_TEAM_BUCS;
+    if (id === 5) return MOCK_SENIORS_TEAM_SEAHAWKS;
+    if (id === 6) return MOCK_SENIORS_TEAM_PATS;
     return MOCK_TEAM_BLANCS; // Default fallback
   }
 
@@ -685,7 +702,7 @@ export async function getTeam(id: number): Promise<Team> {
 /** GET /fields/regions — distinct regions for the Terrain filter chips. */
 export async function listRegions(): Promise<string[]> {
   if (USE_MOCK_DATA) {
-    return ['Île-de-Montréal'];
+    return ['Mauricie'];
   }
 
   const res = await request<{ data: string[] }>('/fields/regions');
