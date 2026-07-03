@@ -592,12 +592,13 @@ function MatchupBanner({
   selectedTeamId: number | null;
   onSelectTeam: (id: number) => void;
 }) {
-  const { tr } = useLang();
+  const { tr, lang } = useLang();
   const home = match.home_team ?? null;
   const away = match.away_team ?? null;
   if (!home && !away) return null;
   const category = home?.category ?? away?.category ?? null;
-  const badge = [match.sport_label, category].filter(Boolean).join(' · ');
+  const startTime = match.starts_at ? fmtTime(new Date(match.starts_at), lang) : null;
+  const badge = [match.sport_label, category, startTime].filter(Boolean).join(' · ');
   const hasSelection = selectedTeamId != null;
 
   return (
