@@ -84,6 +84,8 @@ function Root() {
   const [recents, setRecents] = useState<PlayerHit[]>([]);
   const [tab, setTab] = useState<TabKey>('search');
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null); // null = les deux équipes
+  // A match picked from the Calendrier tab overrides the geo-detected active match.
+  const [overrideMatch, setOverrideMatch] = useState<Match | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [installPromptVisible, setInstallPromptVisible] = useState(false);
   const installPromptRef = useRef<any>(null);
@@ -241,7 +243,18 @@ function Root() {
     };
   }, []);
 
-  const activeMatch: Match | null = geo?.active_match ?? null;
+  // A match chosen in the Calendrier tab wins over the geo-detected one.
+  const activeMatch: Match | null = overrideMatch ?? geo?.active_match ?? null;
+
+  // Called when the user picks a game in the Calendrier: make it the active
+  // match and jump to the search tab so they can look up its players.
+  const activateMatch = useCallback((m: Match) => {
+    setOverrideMatch(m);
+    setSelectedTeamId(null); // previous team filter belongs to another game
+    setNumber('');
+    setHits(null);
+    setTab('search');
+  }, []);
 
   // Filter the results to the team picked in the matchup banner (null = both).
   const displayedHits = useMemo(() => {
@@ -345,7 +358,7 @@ function Root() {
             </Pressable>
           </View>
 
-          {phase === 'ready' && activeMatch && (
+          {(phase === 'ready' || overrideMatch) && activeMatch && (
             <MatchupBanner
               t={t}
               s={s}
@@ -365,7 +378,7 @@ function Root() {
         {tab === 'field' ? (
           <FieldsScreen t={t} s={s} />
         ) : tab === 'calendar' ? (
-          <ScheduleScreen t={t} s={s} coords={coords} phase={phase} />
+          <ScheduleScreen t={t} s={s} coords={coords} phase={phase} onActivateMatch={activateMatch} />
         ) : tab === 'lineups' ? (
           <AlignementsScreen t={t} s={s} />
         ) : tab !== 'search' ? (
@@ -1149,11 +1162,13 @@ function ScheduleScreen({
   s,
   coords,
   phase,
+  onActivateMatch,
 }: {
   t: Theme;
   s: Styles;
   coords: { lat: number; lng: number } | null;
   phase: Phase;
+  onActivateMatch: (m: Match) => void;
 }) {
   const { tr, lang } = useLang();
   const [radiusKm, setRadiusKm] = useState(25);
@@ -1262,6 +1277,10 @@ function ScheduleScreen({
         onSelect={setSelectedMatch}
         onClose={() => setSelectedMatch(null)}
         onOpenField={(f) => (f ? setSelectedField(f) : null)}
+        onActivate={(m) => {
+          setSelectedMatch(null);
+          onActivateMatch(m);
+        }}
       />
 
       <FieldDetailModal t={t} s={s} field={selectedField} onClose={() => setSelectedField(null)} />
@@ -1316,6 +1335,7 @@ function MatchDetailModal({
   onSelect,
   onClose,
   onOpenField,
+  onActivate,
 }: {
   t: Theme;
   s: Styles;
@@ -1324,6 +1344,7 @@ function MatchDetailModal({
   onSelect: (m: Match) => void;
   onClose: () => void;
   onOpenField: (f: Field | null) => void;
+  onActivate: (m: Match) => void;
 }) {
   const { tr, lang } = useLang();
   if (!match) return null;
@@ -1392,6 +1413,20 @@ function MatchDetailModal({
               </Pressable>
             </View>
           </ScrollView>
+
+          <Pressable
+            style={({ pressed }) => [
+              { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
+                backgroundColor: t.primary, borderRadius: radius.md, paddingVertical: spacing.md, marginTop: spacing.md },
+              pressed && { opacity: 0.85 },
+            ]}
+            onPress={() => onActivate(match)}
+          >
+            <Ionicons name="search" size={18} color={t.onPrimary} />
+            <Text style={[s.modalBtnText, { color: t.onPrimary }]}>
+              {lang === 'fr' ? 'Rechercher dans cette partie' : 'Search this game'}
+            </Text>
+          </Pressable>
         </View>
       </View>
     </Modal>
