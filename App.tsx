@@ -293,7 +293,7 @@ function Root() {
     hapticTap();
     if (key === 'del') setNumber((n) => n.slice(0, -1));
     else if (key === 'search') void runSearch(true);
-    else if (number.length < 3) setNumber((n) => n + key);
+    else if (number.length < 2) setNumber((n) => n + key);
   };
 
   return (

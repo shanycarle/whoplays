@@ -488,7 +488,7 @@ export async function findPlayerByNumber(
       for (const lineup of match.lineups) {
         if (lineup.entries) {
           for (const entry of lineup.entries) {
-            if (entry.jersey_number !== null && String(entry.jersey_number).includes(searchStr)) {
+            if (entry.jersey_number !== null && String(entry.jersey_number) === searchStr) {
               const team = lineup.team;
               hits.push({
                 player_id: entry.player_id,
