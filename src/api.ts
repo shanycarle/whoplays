@@ -629,14 +629,41 @@ export async function searchTeams(params?: {
   return res.data;
 }
 
+/**
+ * The mock teams only carry a players_count; their actual rosters live in the
+ * match lineups. Rebuild the roster for a team from the matching lineup entries
+ * so the Alignements roster sheet has players to show.
+ */
+function mockRosterForTeam(teamId: number): RosterPlayer[] {
+  for (const m of MATCHES) {
+    for (const lineup of m.lineups ?? []) {
+      if (lineup.team?.id === teamId) {
+        return (lineup.entries ?? []).map((e) => ({
+          id: e.player_id,
+          first_name: null,
+          last_name: null,
+          full_name: e.full_name,
+          photo_path: null,
+          jersey_number: e.jersey_number,
+          position: e.position,
+        }));
+      }
+    }
+  }
+  return [];
+}
+
 /** GET /teams/{id} — full team with its roster (all players). */
 export async function getTeam(id: number): Promise<Team> {
   if (USE_MOCK_DATA) {
-    if (id === 3) return MOCK_JUNIORS_TEAM_BILLS;
-    if (id === 4) return MOCK_JUNIORS_TEAM_BUCS;
-    if (id === 5) return MOCK_SENIORS_TEAM_SEAHAWKS;
-    if (id === 6) return MOCK_SENIORS_TEAM_PATS;
-    return MOCK_JUNIORS_TEAM_BILLS; // Default fallback
+    const base =
+      id === 3 ? MOCK_JUNIORS_TEAM_BILLS :
+      id === 4 ? MOCK_JUNIORS_TEAM_BUCS :
+      id === 5 ? MOCK_SENIORS_TEAM_SEAHAWKS :
+      id === 6 ? MOCK_SENIORS_TEAM_PATS :
+      MOCK_JUNIORS_TEAM_BILLS; // Default fallback
+    const players = mockRosterForTeam(base.id);
+    return { ...base, players, players_count: players.length };
   }
 
   const res = await request<{ data: Team }>(`/teams/${id}`);
