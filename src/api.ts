@@ -227,8 +227,10 @@ const MOCK_JUNIORS_MATCH: Match = {
     description:
       'Le Stade Gilles-Doucet est le terrain de football du Séminaire Saint-Joseph de Trois-Rivières, situé au 858, rue Laviolette. Inauguré en 2010, il dispose d’un terrain en gazon synthétique, d’un éclairage de qualité pour les soirées et de gradins pouvant accueillir plus de 1 000 spectateurs. Il porte le nom de Gilles Doucet, entraîneur-chef pendant 28 ans, qui a formé plus de 1 200 joueurs et contribué à faire du programme de football du Séminaire une référence régionale.',
     photos: [
-      'https://picsum.photos/seed/stade-gilles-doucet/900/450',
-      'https://picsum.photos/seed/gilles-doucet/500/300',
+      // Served from mobile/public/img/ (copied to the site root on deploy).
+      // Relative paths so they resolve both locally and under the /whoplays/ base.
+      'img/stade-gilles-doucet-1.jpg',
+      'img/stade-gilles-doucet-2.png',
     ],
   },
   home_team: MOCK_JUNIORS_TEAM_BILLS,
