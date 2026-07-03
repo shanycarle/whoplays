@@ -20,7 +20,7 @@ import * as Location from 'expo-location';
 import { ThemeProvider, useTheme } from './src/ThemeContext';
 import { LanguageProvider, useLang, type Lang } from './src/i18n';
 import { hapticSelect, hapticSuccess, hapticTap, hapticWarning } from './src/haptics';
-import { SWATCHES, spacing, radius, type Theme } from './src/theme';
+import { SWATCHES, spacing, radius, withAlpha, type Theme } from './src/theme';
 import {
   ApiError,
   findPlayerByNumber,
@@ -241,29 +241,6 @@ function Root() {
     };
   }, []);
 
-  const handleInstallPwa = useCallback(async () => {
-    const event = installPromptRef.current;
-    if (!event) {
-      setInstallPromptVisible(false);
-      if (typeof window !== 'undefined') {
-        window.open('https://support.google.com/chrome/answer/9658361?hl=fr', '_blank', 'noopener,noreferrer');
-      }
-      return;
-    }
-
-    try {
-      await (event as any).prompt();
-      const choice = await (event as any).userChoice;
-      if (choice?.outcome === 'accepted') {
-        installPromptRef.current = null;
-      }
-    } catch {
-      // noop
-    } finally {
-      setInstallPromptVisible(false);
-    }
-  }, []);
-
   const activeMatch: Match | null = geo?.active_match ?? null;
 
   // Filter the results to the team picked in the matchup banner (null = both).
@@ -450,42 +427,125 @@ function Root() {
 
       <FieldDetailModal t={t} s={s} field={selectedField} onClose={() => setSelectedField(null)} />
 
-      <InstallPwaPrompt
+      <BetaWelcomeModal
         visible={installPromptVisible}
         onClose={() => setInstallPromptVisible(false)}
-        onInstall={handleInstallPwa}
+        t={t}
         s={s}
       />
     </View>
   );
 }
 
-function InstallPwaPrompt({ visible, onClose, onInstall, s }: { visible: boolean; onClose: () => void; onInstall: () => void; s: Styles }) {
+function BetaWelcomeModal({ visible, onClose, t, s }: { visible: boolean; onClose: () => void; t: Theme; s: Styles }) {
   if (Platform.OS !== 'web') return null;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={s.modalBackdrop} onPress={onClose}>
-        <Pressable style={[s.modalSheet, { borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg }] } onPress={(e) => e.stopPropagation()}>
+        <Pressable
+          style={[s.modalSheet, { borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, maxHeight: '90%' }]}
+          onPress={(e) => e.stopPropagation()}
+        >
           <View style={s.modalHandle} />
-          <Text style={s.modalTitle}>Installer WhoPlays</Text>
-          <View style={[s.preview, { backgroundColor: '#F3F7FF', marginTop: spacing.md }] }>
-            <Ionicons name="phone-portrait-outline" size={24} color={s.previewText.color} />
-            <View style={{ flex: 1 }}>
-              <Text style={s.previewText}>Pour une meilleure expérience, ajoutez WhoPlays à l’écran d’accueil.</Text>
-              <Text style={{ color: '#64748B', fontSize: 13, marginTop: 6 }}>
-                Vous bénéficierez du plein écran et d’un accès plus rapide à chaque visite.
+
+          <ScrollView
+            style={{ flexGrow: 0, flexShrink: 1 }}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.sm }}
+          >
+            {/* Brand header */}
+            <View
+              style={{
+                backgroundColor: t.primary,
+                borderRadius: radius.md,
+                paddingVertical: spacing.lg,
+                paddingHorizontal: spacing.lg,
+                alignItems: 'center',
+                gap: spacing.md,
+              }}
+            >
+              <Text style={{ fontSize: 30, fontWeight: '900', letterSpacing: 0.5 }}>
+                <Text style={{ color: t.onPrimary }}>Who</Text>
+                <Text style={{ color: t.secondary }}>Plays</Text>
+                <Text style={{ color: t.onPrimary, fontSize: 18 }}>.io</Text>
+              </Text>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  backgroundColor: t.secondary,
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: 4,
+                  borderRadius: radius.pill,
+                }}
+              >
+                <Ionicons name="flask" size={14} color={t.onSecondary} />
+                <Text style={{ color: t.onSecondary, fontWeight: '900', fontSize: 12, letterSpacing: 1 }}>VERSION BÊTA</Text>
+              </View>
+            </View>
+
+            {/* Welcome + presentation */}
+            <Text style={{ color: t.text, fontSize: 21, fontWeight: '900' }}>Bienvenue sur WhoPlays 👋</Text>
+            <Text style={{ color: t.text, fontSize: 15, lineHeight: 22 }}>
+              WhoPlays te permet de <Text style={{ fontWeight: '800' }}>retrouver un joueur par son numéro</Text> en un
+              instant, et de consulter les alignements des équipes, les terrains et les parties qui se jouent près de toi.
+            </Text>
+            <Text style={{ color: t.text, fontSize: 15, lineHeight: 22 }}>
+              L’application est encore en <Text style={{ fontWeight: '800', color: t.primary }}>version bêta</Text>, et
+              aujourd’hui marque son <Text style={{ fontWeight: '800', color: t.primary }}>tout premier test officiel</Text>.
+              Merci de faire partie de l’aventure ! 🎉
+            </Text>
+
+            {/* Coming soon on stores */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: spacing.md,
+                backgroundColor: withAlpha(t.secondary, 0.14),
+                borderRadius: radius.md,
+                padding: spacing.md,
+                borderWidth: 1,
+                borderColor: withAlpha(t.secondary, 0.4),
+              }}
+            >
+              <View style={{ flexDirection: 'row', gap: 6 }}>
+                <Ionicons name="logo-apple" size={22} color={t.text} />
+                <Ionicons name="logo-google-playstore" size={20} color={t.text} />
+              </View>
+              <Text style={{ flex: 1, color: t.text, fontSize: 14, lineHeight: 20 }}>
+                Bientôt disponible sur <Text style={{ fontWeight: '800' }}>iOS</Text> et{' '}
+                <Text style={{ fontWeight: '800' }}>Android</Text>.
               </Text>
             </View>
-          </View>
-          <View style={s.modalActions}>
-            <Pressable style={[s.modalBtn, s.modalBtnGhost]} onPress={onClose}>
-              <Text style={[s.modalBtnText, { color: '#334155' }]}>Plus tard</Text>
-            </Pressable>
-            <Pressable style={[s.modalBtn, { backgroundColor: '#2563EB' }]} onPress={onInstall}>
-              <Text style={[s.modalBtnText, { color: '#FFFFFF' }]}>Installer</Text>
-            </Pressable>
-          </View>
+
+            {/* Add-to-home-screen tip */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'flex-start',
+                gap: spacing.md,
+                backgroundColor: t.placeholderBg,
+                borderRadius: radius.md,
+                padding: spacing.md,
+              }}
+            >
+              <Ionicons name="add-circle" size={24} color={t.primary} />
+              <Text style={{ flex: 1, color: t.text, fontSize: 14, lineHeight: 20 }}>
+                Astuce : <Text style={{ fontWeight: '800' }}>ajoute le raccourci à ton écran d’accueil</Text> pour profiter
+                du plein écran et faire disparaître la barre d’adresse du navigateur.
+              </Text>
+            </View>
+          </ScrollView>
+
+          <Pressable
+            style={{ borderRadius: radius.md, paddingVertical: spacing.md, alignItems: 'center', backgroundColor: t.primary, marginTop: spacing.md }}
+            onPress={onClose}
+          >
+            <Text style={[s.modalBtnText, { color: t.onPrimary }]}>C’est parti !</Text>
+          </Pressable>
         </Pressable>
       </Pressable>
     </Modal>
