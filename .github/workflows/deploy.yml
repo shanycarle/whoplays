@@ -5,17 +5,20 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
+# Official GitHub Pages deployment (source must be set to "GitHub Actions"
+# in Settings → Pages). This replaces the old branch-based deploy, which left
+# GitHub's legacy "pages build and deployment" builder failing on every push.
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
 concurrency:
-  group: github-pages
+  group: pages
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -36,17 +39,26 @@ jobs:
           PUBLIC_URL: /${{ github.event.repository.name }}/
         run: npx expo export --platform web --output-dir web-build
 
-      - name: Ensure Pages fallback
+      - name: SPA fallback for unknown routes
         run: cp public/404.html web-build/404.html
 
-      - name: Add .nojekyll
-        run: touch web-build/.nojekyll
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_branch: gh-pages
-          publish_dir: ./web-build
-          force_orphan: true
-          enable_jekyll: false
+          enablement: true
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web-build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
