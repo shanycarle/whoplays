@@ -1748,21 +1748,7 @@ function PlayerDetailModal({
   // Prefer the tapped context (hit) for the badge/team, profile for the rest.
   const number = hit?.jersey_number ?? profile?.jersey_number ?? null;
   const name = hit?.full_name ?? profile?.full_name ?? '—';
-  const position = hit?.position ?? profile?.position ?? '';
-  const team = hit?.team ?? profile?.team ?? '';
   const photo = profile?.photo_path ?? hit?.photo_path ?? null;
-
-  const val = (v: string | number | null | undefined) =>
-    v === null || v === undefined || v === '' ? '—' : String(v);
-
-  const dob = profile?.birthdate
-    ? `${profile.birthdate}${profile.age != null ? ` (${tr('yearsOld', { n: profile.age })})` : ''}`
-    : '—';
-  const numbers = profile?.numbers?.length
-    ? profile.numbers.join(', ')
-    : number != null
-    ? String(number)
-    : '—';
 
   return (
     <Modal visible={!!hit} transparent animationType="fade" onRequestClose={onClose}>
@@ -1790,47 +1776,17 @@ function PlayerDetailModal({
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={s.zoomName}>{name}</Text>
-                {!!position && <Text style={s.zoomPosition}>{position}</Text>}
-                {!!team && <Text style={s.zoomTeam}>{team}</Text>}
               </View>
-            </View>
-
-            <View style={s.zoomStats}>
-              <StatItem s={s} label={tr('number')} value={val(number)} />
-              <StatItem s={s} label={tr('age')} value={val(profile?.age)} />
-              <StatItem s={s} label={tr('year')} value={val(profile?.school_year)} />
             </View>
 
             {loading && <ActivityIndicator color={t.primary} style={{ marginVertical: spacing.md }} />}
 
-            <Section t={t} s={s} title={tr('measurements')}>
-              <View style={s.infoRow}>
-                <InfoItem t={t} s={s} flex icon={<MaterialCommunityIcons name="ruler" size={20} color={t.primary} />}
-                  label={tr('height')}
-                  value={profile?.height_cm != null ? `${profile.height_cm} cm` : '—'}
-                  sub={profile?.height_cm != null ? cmToFtIn(profile.height_cm) : undefined} />
-                <InfoItem t={t} s={s} flex icon={<MaterialCommunityIcons name="weight-kilogram" size={20} color={t.primary} />}
-                  label={tr('weight')}
-                  value={profile?.weight_kg != null ? `${profile.weight_kg} kg` : '—'}
-                  sub={profile?.weight_kg != null ? `${Math.round(profile.weight_kg * 2.20462)} lb` : undefined} />
-              </View>
-            </Section>
-
-            <Section t={t} s={s} title={tr('academicInfo')}>
-              <InfoItem t={t} s={s} icon={<MaterialCommunityIcons name="book-open-variant" size={20} color={t.primary} />}
-                label={tr('discipline')} value={val(profile?.discipline)} />
-            </Section>
-
-            <Section t={t} s={s} title={tr('otherInfo')}>
-              <View style={s.infoGrid}>
-                <InfoItem t={t} s={s} half icon={<MaterialCommunityIcons name="tshirt-crew-outline" size={20} color={t.primary} />}
-                  label={tr('jerseyNumbers')} value={numbers} />
-                <InfoItem t={t} s={s} half icon={<Ionicons name="calendar-outline" size={19} color={t.primary} />}
-                  label={tr('birthdate')} value={dob} />
-                <InfoItem t={t} s={s} half icon={<Ionicons name="home-outline" size={19} color={t.primary} />}
-                  label={tr('hometown')} value={val(profile?.hometown)} />
-              </View>
-            </Section>
+            <View style={[s.infoRow, { marginTop: spacing.lg }]}>
+              <InfoItem t={t} s={s} flex icon={<MaterialCommunityIcons name="tshirt-crew-outline" size={20} color={t.primary} />}
+                label={tr('number')} value={number != null ? String(number) : '—'} />
+              <InfoItem t={t} s={s} flex icon={<Ionicons name="home-outline" size={19} color={t.primary} />}
+                label={tr('hometown')} value="Trois-Rivières" />
+            </View>
           </ScrollView>
         </Pressable>
       </Pressable>
