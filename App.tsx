@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import {
   ActivityIndicator,
   Image,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -90,6 +91,9 @@ function Root() {
   const [installPromptVisible, setInstallPromptVisible] = useState(false);
   const installPromptRef = useRef<any>(null);
   const [selectedField, setSelectedField] = useState<Field | null>(null);
+  // Terrain the user explicitly picked from the header dropdown (overrides geo).
+  const [manualField, setManualField] = useState<Field | null>(null);
+  const [fieldPickerOpen, setFieldPickerOpen] = useState(false);
   const triedDemo = useRef(false);
 
   // Player zoom popup
@@ -167,6 +171,7 @@ function Root() {
     setNumber('');
     setHits(null);
     setSelectedTeamId(null);
+    setManualField(null);
     try {
       let lat: number;
       let lng: number;
@@ -246,6 +251,21 @@ function Root() {
   // A match chosen in the Calendrier tab wins over the geo-detected one.
   const activeMatch: Match | null = overrideMatch ?? geo?.active_match ?? null;
 
+  // The field shown in the header: a manual pick wins over the geo-detected one.
+  const activeField: Field | null =
+    manualField ?? activeMatch?.field ?? geo?.field ?? null;
+
+  // Fields the user can switch between via the header dropdown (deduped).
+  const fieldChoices: Field[] = useMemo(() => {
+    const list = [
+      geo?.field,
+      activeMatch?.field,
+      ...(geo?.candidates ?? []),
+    ].filter((f): f is Field => !!f);
+    const seen = new Set<number>();
+    return list.filter((f) => (seen.has(f.id) ? false : seen.add(f.id)));
+  }, [geo, activeMatch]);
+
   // Called when the user picks a game in the Calendrier: make it the active
   // match and jump to the search tab so they can look up its players.
   const activateMatch = useCallback((m: Match) => {
@@ -311,53 +331,32 @@ function Root() {
 
   return (
     <View style={s.screen}>
-      <StatusBar barStyle={t.onPrimary === '#FFFFFF' ? 'light-content' : 'dark-content'} />
+      <StatusBar barStyle="dark-content" />
 
-      {/* ---- Green top panel ---- */}
-      <SafeAreaView edges={['top']} style={{ backgroundColor: t.primary }}>
+      {/* ---- Light top panel (green/gold used as accents) ---- */}
+      <SafeAreaView edges={['top']} style={{ backgroundColor: t.headerBg }}>
         <View style={s.topPanel}>
-          <View style={s.topRow}>
-            <View style={s.topSide} />
+          {/* Header line: logo · stadium selector · profile — all on one row */}
+          <View style={s.headerRow}>
             <Logo t={t} s={s} />
-            <Pressable onPress={() => setProfileOpen(true)} hitSlop={10} style={[s.topSide, { alignItems: 'flex-end' }]}>
-              <Ionicons name="person-circle" size={30} color={t.secondary} />
+            <HeaderLocation
+              t={t}
+              s={s}
+              field={activeField}
+              phase={phase}
+              onOpenMaps={() => activeField && openInMaps(activeField)}
+              onOpenField={() => activeField && setSelectedField(activeField)}
+              onPickField={() => {
+                hapticSelect();
+                setFieldPickerOpen(true);
+              }}
+            />
+            <Pressable onPress={() => setProfileOpen(true)} hitSlop={10} style={s.profileBtn}>
+              <Ionicons name="person-circle" size={32} color={t.primary} />
             </Pressable>
           </View>
 
-          <View style={s.titleRow}>
-            <View style={s.titleLine} />
-            <Text style={s.title}>{tr('findByNumber')}</Text>
-            <View style={s.titleLine} />
-          </View>
-
-          <View style={s.searchBar}>
-            <Ionicons name="search" size={20} color={t.muted} />
-            <Text style={[s.searchText, number === '' && s.searchPlaceholder]} numberOfLines={1}>
-              {number === '' ? tr('enterNumberPh') : `N° ${number}`}
-            </Text>
-          </View>
-
-          <View style={s.locationRow}>
-            <Ionicons name="location-sharp" size={16} color={t.secondary} />
-            <Pressable
-              onPress={() => geo?.field && setSelectedField(geo.field)}
-              style={{ flex: 1 }}
-              hitSlop={8}
-            >
-              <Text style={s.locationText} numberOfLines={1}>
-                {phase === 'ready'
-                  ? geo?.field?.name ?? tr('noFieldNearby')
-                  : phase === 'error'
-                  ? tr('locationUnavailable')
-                  : tr('locating')}
-              </Text>
-            </Pressable>
-            <Pressable onPress={() => locate()} hitSlop={8} style={s.changeBtn}>
-              <Ionicons name="locate" size={15} color={t.secondary} />
-              <Text style={s.changeText}>{tr('change')}</Text>
-            </Pressable>
-          </View>
-
+          {/* Active match, shown as its own block */}
           {(phase === 'ready' || overrideMatch) && activeMatch && (
             <MatchupBanner
               t={t}
@@ -370,6 +369,20 @@ function Root() {
               }}
             />
           )}
+
+          {/* Title + search bar (unchanged) */}
+          <View style={s.titleRow}>
+            <View style={s.titleLine} />
+            <Text style={s.title}>{tr('findByNumber')}</Text>
+            <View style={s.titleLine} />
+          </View>
+
+          <View style={s.searchBar}>
+            <Ionicons name="search" size={20} color={t.muted} />
+            <Text style={[s.searchText, number === '' && s.searchPlaceholder]} numberOfLines={1}>
+              {number === '' ? tr('enterNumberPh') : `N° ${number}`}
+            </Text>
+          </View>
         </View>
       </SafeAreaView>
 
@@ -439,6 +452,24 @@ function Root() {
       />
 
       <FieldDetailModal t={t} s={s} field={selectedField} onClose={() => setSelectedField(null)} />
+
+      <FieldPickerModal
+        t={t}
+        s={s}
+        visible={fieldPickerOpen}
+        fields={fieldChoices}
+        activeId={activeField?.id ?? null}
+        onClose={() => setFieldPickerOpen(false)}
+        onSelect={(f) => {
+          hapticSelect();
+          setManualField(f);
+          setFieldPickerOpen(false);
+        }}
+        onRelocate={() => {
+          setFieldPickerOpen(false);
+          void locate();
+        }}
+      />
 
       <BetaWelcomeModal
         visible={installPromptVisible}
@@ -567,15 +598,152 @@ function BetaWelcomeModal({ visible, onClose, t, s }: { visible: boolean; onClos
 
 // ---------- Presentational pieces ----------
 
+/** Open the field in Google Maps (by coordinates when known, else by name/address). */
+function openInMaps(field: Field) {
+  const query =
+    field.latitude != null && field.longitude != null
+      ? `${field.latitude},${field.longitude}`
+      : encodeURIComponent([field.name, field.address].filter(Boolean).join(' '));
+  Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`).catch(() => {});
+}
+
 function Logo({ t, s }: { t: Theme; s: Styles }) {
   return (
     <View style={s.logo}>
       <Text style={s.logoText}>
-        <Text style={{ color: t.onPrimary }}>Who</Text>
+        <Text style={{ color: t.primary }}>Who</Text>
         <Text style={{ color: t.secondary }}>Plays</Text>
-        <Text style={[s.logoIo, { color: t.onPrimary }]}>.io</Text>
+        <Text style={[s.logoIo, { color: t.primary }]}>.io</Text>
       </Text>
     </View>
+  );
+}
+
+/**
+ * Stadium selector pill sitting on the header line. Three independent tap zones:
+ *  📍 pin  → Google Maps · stadium name → field page · ▾ chevron → field picker.
+ */
+function HeaderLocation({
+  t,
+  s,
+  field,
+  phase,
+  onOpenMaps,
+  onOpenField,
+  onPickField,
+}: {
+  t: Theme;
+  s: Styles;
+  field: Field | null;
+  phase: Phase;
+  onOpenMaps: () => void;
+  onOpenField: () => void;
+  onPickField: () => void;
+}) {
+  const { tr } = useLang();
+  const label =
+    phase === 'ready'
+      ? field?.name ?? tr('noFieldNearby')
+      : phase === 'error'
+      ? tr('locationUnavailable')
+      : tr('locating');
+  const hasField = !!field;
+
+  return (
+    <View style={s.locPill}>
+      <Pressable onPress={onOpenMaps} disabled={!hasField} hitSlop={6} style={s.locZone}>
+        <Ionicons name="location-sharp" size={16} color={t.primary} />
+      </Pressable>
+      <Pressable onPress={onOpenField} disabled={!hasField} hitSlop={6} style={s.locNameZone}>
+        <Text style={s.locName} numberOfLines={1}>
+          {label}
+        </Text>
+      </Pressable>
+      <Pressable onPress={onPickField} hitSlop={6} style={s.locZone}>
+        <Ionicons name="chevron-down" size={16} color={t.primary} />
+      </Pressable>
+    </View>
+  );
+}
+
+/** Bottom sheet to switch which nearby field is active, or re-detect by GPS. */
+function FieldPickerModal({
+  t,
+  s,
+  visible,
+  fields,
+  activeId,
+  onSelect,
+  onRelocate,
+  onClose,
+}: {
+  t: Theme;
+  s: Styles;
+  visible: boolean;
+  fields: Field[];
+  activeId: number | null;
+  onSelect: (f: Field) => void;
+  onRelocate: () => void;
+  onClose: () => void;
+}) {
+  const { tr, lang } = useLang();
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={s.modalBackdrop} onPress={onClose}>
+        <Pressable style={[s.modalSheet, { maxHeight: '80%' }]} onPress={(e) => e.stopPropagation()}>
+          <View style={s.modalHandle} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
+            <Text style={[s.modalTitle, { flex: 1 }]}>
+              {lang === 'fr' ? 'Choisir le terrain' : 'Choose the field'}
+            </Text>
+            <Pressable onPress={onClose} hitSlop={10}>
+              <Ionicons name="close" size={24} color={t.muted} />
+            </Pressable>
+          </View>
+
+          <ScrollView contentContainerStyle={{ paddingBottom: spacing.sm }}>
+            {fields.length === 0 ? (
+              <Text style={[s.placeholderSub, { paddingVertical: spacing.md }]}>
+                {tr('noFieldNearby')}
+              </Text>
+            ) : (
+              fields.map((f) => {
+                const active = f.id === activeId;
+                return (
+                  <Pressable
+                    key={f.id}
+                    onPress={() => onSelect(f)}
+                    style={({ pressed }) => [s.pickerRow, active && s.pickerRowActive, pressed && { opacity: 0.7 }]}
+                  >
+                    <View style={[s.pickerIcon, { backgroundColor: active ? t.secondary : t.primary }]}>
+                      {sportIcon(f.sport_type ?? f.sports[0]?.key ?? null, active ? t.onSecondary : t.onPrimary, 18)}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.pickerName} numberOfLines={1}>{f.name}</Text>
+                      <Text style={s.pickerMeta} numberOfLines={1}>
+                        {[f.city, f.region].filter(Boolean).join(' · ') || tr('regionUnknown')}
+                        {f.distance_m != null ? ` · ${fmtDist(f.distance_m)}` : ''}
+                      </Text>
+                    </View>
+                    {active && <Ionicons name="checkmark-circle" size={22} color={t.secondary} />}
+                  </Pressable>
+                );
+              })
+            )}
+          </ScrollView>
+
+          <Pressable
+            style={({ pressed }) => [s.relocateBtn, pressed && { opacity: 0.85 }]}
+            onPress={onRelocate}
+          >
+            <Ionicons name="locate" size={18} color={t.onPrimary} />
+            <Text style={[s.modalBtnText, { color: t.onPrimary }]}>
+              {lang === 'fr' ? 'Me relocaliser (GPS)' : 'Detect my location'}
+            </Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -1992,24 +2160,48 @@ function makeStyles(t: Theme) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: t.screenBg },
 
-    topPanel: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, paddingTop: spacing.sm },
-    topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    topSide: { width: 36, justifyContent: 'center' },
-    logo: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    logoText: { fontSize: 22, fontWeight: '900' },
-    logoIo: { fontSize: 12, fontWeight: '700' },
-    teamsBtn: { alignItems: 'center' },
-    teamsLabel: { color: t.secondary, fontSize: 10, fontWeight: '700', marginTop: 2 },
+    topPanel: {
+      backgroundColor: t.headerBg,
+      paddingHorizontal: spacing.lg,
+      paddingBottom: spacing.lg,
+      paddingTop: spacing.sm,
+      borderBottomLeftRadius: radius.lg,
+      borderBottomRightRadius: radius.lg,
+      shadowColor: '#000',
+      shadowOpacity: 0.05,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 3,
+    },
+    headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    logo: { flexDirection: 'row', alignItems: 'center' },
+    logoText: { fontSize: 20, fontWeight: '900' },
+    logoIo: { fontSize: 11, fontWeight: '700' },
+    profileBtn: { justifyContent: 'center', alignItems: 'flex-end' },
+
+    // ---- Stadium selector (header line) — flat on the cream panel ----
+    locPill: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: 34,
+    },
+    locZone: { paddingHorizontal: 3, height: '100%', justifyContent: 'center' },
+    locNameZone: { flexShrink: 1, height: '100%', justifyContent: 'center', paddingHorizontal: 2 },
+    locName: { color: t.text, fontSize: 14, fontWeight: '700' },
 
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg },
     titleLine: { flex: 1, height: 1, backgroundColor: t.divider },
-    title: { color: t.onPrimary, fontSize: 12, fontWeight: '800', letterSpacing: 1, opacity: 0.95 },
+    title: { color: t.primary, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
 
     searchBar: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.sm,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: t.cardBg,
+      borderWidth: 1,
+      borderColor: t.cardBorder,
       borderRadius: radius.md,
       paddingHorizontal: spacing.md,
       height: 52,
@@ -2018,15 +2210,22 @@ function makeStyles(t: Theme) {
     searchText: { flex: 1, color: t.text, fontSize: 18, fontWeight: '700' },
     searchPlaceholder: { color: t.muted, fontWeight: '500' },
 
-    locationRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing.md },
-    locationText: { color: t.onPrimary, fontSize: 14, fontWeight: '600', flexShrink: 1 },
-    changeBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 'auto' },
-    changeText: { color: t.secondary, fontSize: 14, fontWeight: '700' },
-
-    // ---- Matchup banner (active match) ----
+    // ---- Matchup block (active match) ----
     matchup: {
-      marginTop: spacing.md, paddingTop: spacing.md,
-      borderTopWidth: 1, borderTopColor: t.divider, alignItems: 'center', gap: spacing.sm,
+      marginTop: spacing.lg,
+      backgroundColor: t.cardBg,
+      borderWidth: 1,
+      borderColor: withAlpha(t.secondary, 0.35),
+      borderRadius: radius.lg,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.md,
+      alignItems: 'center',
+      gap: spacing.sm,
+      shadowColor: '#000',
+      shadowOpacity: 0.06,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 2,
     },
     matchupRow: { flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch' },
     matchTeam: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
@@ -2043,7 +2242,7 @@ function makeStyles(t: Theme) {
       borderWidth: 1, borderColor: t.primary,
     },
     matchupHint: { color: t.muted, fontSize: 11, fontWeight: '600', marginTop: 2 },
-    teamName: { flex: 1, color: t.onPrimary, fontSize: 14, fontWeight: '800' },
+    teamName: { flex: 1, color: t.text, fontSize: 14, fontWeight: '800' },
     vsWrap: { paddingHorizontal: spacing.sm },
     vsText: { color: t.secondary, fontSize: 13, fontWeight: '900', letterSpacing: 1 },
     catBadge: {
@@ -2052,6 +2251,22 @@ function makeStyles(t: Theme) {
       paddingHorizontal: spacing.md, paddingVertical: 3,
     },
     catBadgeText: { color: t.secondary, fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
+
+    // ---- Field picker sheet ----
+    pickerRow: {
+      flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+      backgroundColor: t.placeholderBg, borderRadius: radius.md,
+      padding: spacing.md, marginBottom: spacing.sm,
+      borderWidth: 1, borderColor: 'transparent',
+    },
+    pickerRowActive: { borderColor: t.secondary, backgroundColor: withAlpha(t.secondary, 0.12) },
+    pickerIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+    pickerName: { color: t.text, fontSize: 15, fontWeight: '800' },
+    pickerMeta: { color: t.muted, fontSize: 12, marginTop: 2 },
+    relocateBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
+      backgroundColor: t.primary, borderRadius: radius.md, paddingVertical: spacing.md, marginTop: spacing.sm,
+    },
 
     body: { padding: spacing.lg, paddingBottom: spacing.xl },
 

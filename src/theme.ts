@@ -46,6 +46,7 @@ export type Theme = {
   onPrimary: string; // legible text/icons over primary
   onSecondary: string; // legible text/icons over secondary
   screenBg: string;
+  headerBg: string; // light top-panel background (green/gold sit on it as accents)
   cardBg: string;
   cardBorder: string;
   text: string;
@@ -61,6 +62,7 @@ export function deriveTheme({ primary, secondary }: Palette): Theme {
     onPrimary: contrastText(primary),
     onSecondary: contrastText(secondary),
     screenBg: '#FFFFFF',
+    headerBg: '#F5F3EC', // warm cream
     cardBg: '#FFFFFF',
     cardBorder: '#E7E7DF',
     text: '#13241D',
