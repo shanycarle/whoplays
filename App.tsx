@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Image,
   Linking,
   Modal,
@@ -255,6 +256,15 @@ function Root() {
   const activeField: Field | null =
     manualField ?? activeMatch?.field ?? geo?.field ?? null;
 
+  // The big number takes the targeted team's color (falls back to the primary).
+  const numberAccent = useMemo(() => {
+    if (selectedTeamId == null) return t.primary;
+    const home = activeMatch?.home_team;
+    const away = activeMatch?.away_team;
+    const team = home?.id === selectedTeamId ? home : away?.id === selectedTeamId ? away : null;
+    return team?.color_primary ?? t.primary;
+  }, [selectedTeamId, activeMatch, t.primary]);
+
   // Fields the user can switch between via the header dropdown (deduped).
   const fieldChoices: Field[] = useMemo(() => {
     const list = [
@@ -331,10 +341,10 @@ function Root() {
 
   return (
     <View style={s.screen}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={t.onPrimary === '#FFFFFF' ? 'light-content' : 'dark-content'} />
 
-      {/* ---- Light top panel (green/gold used as accents) ---- */}
-      <SafeAreaView edges={['top']} style={{ backgroundColor: t.headerBg }}>
+      {/* ---- Colored top panel (team colors) ---- */}
+      <SafeAreaView edges={['top']} style={{ backgroundColor: t.primary }}>
         <View style={s.topPanel}>
           {/* Header line: logo · stadium selector · profile — all on one row */}
           <View style={s.headerRow}>
@@ -352,7 +362,7 @@ function Root() {
               }}
             />
             <Pressable onPress={() => setProfileOpen(true)} hitSlop={10} style={s.profileBtn}>
-              <Ionicons name="person-circle" size={32} color={t.primary} />
+              <Ionicons name="person-circle" size={32} color={t.secondary} />
             </Pressable>
           </View>
 
@@ -370,19 +380,14 @@ function Root() {
             />
           )}
 
-          {/* Title + search bar (unchanged) */}
+          {/* Title BELOW the match info, then the big number display */}
           <View style={s.titleRow}>
             <View style={s.titleLine} />
             <Text style={s.title}>{tr('findByNumber')}</Text>
             <View style={s.titleLine} />
           </View>
 
-          <View style={s.searchBar}>
-            <Ionicons name="search" size={20} color={t.muted} />
-            <Text style={[s.searchText, number === '' && s.searchPlaceholder]} numberOfLines={1}>
-              {number === '' ? tr('enterNumberPh') : `N° ${number}`}
-            </Text>
-          </View>
+          <NumberDisplay t={t} s={s} value={number} accent={numberAccent} />
         </View>
       </SafeAreaView>
 
@@ -611,10 +616,48 @@ function Logo({ t, s }: { t: Theme; s: Styles }) {
   return (
     <View style={s.logo}>
       <Text style={s.logoText}>
-        <Text style={{ color: t.primary }}>Who</Text>
+        <Text style={{ color: t.onPrimary }}>Who</Text>
         <Text style={{ color: t.secondary }}>Plays</Text>
-        <Text style={[s.logoIo, { color: t.primary }]}>.io</Text>
+        <Text style={[s.logoIo, { color: t.onPrimary }]}>.io</Text>
       </Text>
+    </View>
+  );
+}
+
+/**
+ * Big number display that sits under the match info, right above the keypad.
+ * No grey label — the section title already says what it is. The digits take the
+ * targeted team's color, with a blinking caret to show the keypad "writes" here.
+ */
+function NumberDisplay({ t, s, value, accent }: { t: Theme; s: Styles; value: string; accent: string }) {
+  const blink = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(blink, { toValue: 0, duration: 90, delay: 470, useNativeDriver: true }),
+        Animated.timing(blink, { toValue: 1, duration: 90, delay: 470, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [blink]);
+
+  const isEmpty = value === '';
+  const chars = isEmpty ? ['0', '0'] : value.split('');
+
+  return (
+    <View style={s.numDisp}>
+      <View style={[s.numJersey, { backgroundColor: withAlpha(accent, 0.14) }]}>
+        <MaterialCommunityIcons name="tshirt-crew" size={22} color={accent} />
+      </View>
+      <View style={s.numDigits}>
+        {chars.map((c, i) => (
+          <Text key={i} style={[s.numDigit, { color: isEmpty ? withAlpha(t.muted, 0.35) : accent }]}>
+            {c}
+          </Text>
+        ))}
+        <Animated.View style={[s.numCaret, { backgroundColor: accent, opacity: blink }]} />
+      </View>
     </View>
   );
 }
@@ -652,7 +695,7 @@ function HeaderLocation({
   return (
     <View style={s.locPill}>
       <Pressable onPress={onOpenMaps} disabled={!hasField} hitSlop={6} style={s.locZone}>
-        <Ionicons name="location-sharp" size={16} color={t.primary} />
+        <Ionicons name="location-sharp" size={16} color={t.secondary} />
       </Pressable>
       <Pressable onPress={onOpenField} disabled={!hasField} hitSlop={6} style={s.locNameZone}>
         <Text style={s.locName} numberOfLines={1}>
@@ -660,7 +703,7 @@ function HeaderLocation({
         </Text>
       </Pressable>
       <Pressable onPress={onPickField} hitSlop={6} style={s.locZone}>
-        <Ionicons name="chevron-down" size={16} color={t.primary} />
+        <Ionicons name="chevron-down" size={16} color={t.onPrimary} />
       </Pressable>
     </View>
   );
@@ -2161,17 +2204,10 @@ function makeStyles(t: Theme) {
     screen: { flex: 1, backgroundColor: t.screenBg },
 
     topPanel: {
-      backgroundColor: t.headerBg,
+      backgroundColor: t.primary,
       paddingHorizontal: spacing.lg,
       paddingBottom: spacing.lg,
       paddingTop: spacing.sm,
-      borderBottomLeftRadius: radius.lg,
-      borderBottomRightRadius: radius.lg,
-      shadowColor: '#000',
-      shadowOpacity: 0.05,
-      shadowRadius: 10,
-      shadowOffset: { width: 0, height: 4 },
-      elevation: 3,
     },
     headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     logo: { flexDirection: 'row', alignItems: 'center' },
@@ -2179,7 +2215,7 @@ function makeStyles(t: Theme) {
     logoIo: { fontSize: 11, fontWeight: '700' },
     profileBtn: { justifyContent: 'center', alignItems: 'flex-end' },
 
-    // ---- Stadium selector (header line) — flat on the cream panel ----
+    // ---- Stadium selector (header line) — flat on the colored panel ----
     locPill: {
       flex: 1,
       flexDirection: 'row',
@@ -2189,26 +2225,34 @@ function makeStyles(t: Theme) {
     },
     locZone: { paddingHorizontal: 3, height: '100%', justifyContent: 'center' },
     locNameZone: { flexShrink: 1, height: '100%', justifyContent: 'center', paddingHorizontal: 2 },
-    locName: { color: t.text, fontSize: 14, fontWeight: '700' },
+    locName: { color: t.onPrimary, fontSize: 14, fontWeight: '700' },
 
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg },
-    titleLine: { flex: 1, height: 1, backgroundColor: t.divider },
-    title: { color: t.primary, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
+    titleLine: { flex: 1, height: 1, backgroundColor: withAlpha(t.onPrimary, 0.28) },
+    title: { color: t.onPrimary, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
 
-    searchBar: {
+    // ---- Big number display (input feedback, replaces the search bar) ----
+    numDisp: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: spacing.sm,
+      justifyContent: 'center',
+      gap: spacing.md,
       backgroundColor: t.cardBg,
-      borderWidth: 1,
-      borderColor: t.cardBorder,
-      borderRadius: radius.md,
-      paddingHorizontal: spacing.md,
-      height: 52,
+      borderRadius: radius.lg,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      height: 84,
       marginTop: spacing.lg,
+      shadowColor: '#000',
+      shadowOpacity: 0.12,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 4,
     },
-    searchText: { flex: 1, color: t.text, fontSize: 18, fontWeight: '700' },
-    searchPlaceholder: { color: t.muted, fontWeight: '500' },
+    numJersey: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+    numDigits: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+    numDigit: { fontSize: 54, lineHeight: 60, fontWeight: '900', letterSpacing: -1, fontVariant: ['tabular-nums'] },
+    numCaret: { width: 4, height: 40, borderRadius: 2, marginLeft: 4 },
 
     // ---- Matchup block (active match) ----
     matchup: {
