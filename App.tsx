@@ -22,7 +22,7 @@ import * as Location from 'expo-location';
 import { ThemeProvider, useTheme } from './src/ThemeContext';
 import { LanguageProvider, useLang, type Lang } from './src/i18n';
 import { hapticSelect, hapticSuccess, hapticTap, hapticWarning } from './src/haptics';
-import { SWATCHES, spacing, radius, withAlpha, type Theme } from './src/theme';
+import { SWATCHES, spacing, radius, withAlpha, contrastText, type Theme } from './src/theme';
 import {
   ApiError,
   findPlayerByNumber,
@@ -403,7 +403,7 @@ function Root() {
           <StubScreen t={t} s={s} label={tr(TABS.find((x) => x.key === tab)!.labelKey as never)} />
         ) : (
           <>
-            <Keypad t={t} s={s} onPress={press} canDelete={number !== ''} searching={searching} />
+            {/* Result sits directly above the keypad — closer to the number/search loop */}
             <ResultCard
               t={t}
               s={s}
@@ -412,8 +412,12 @@ function Root() {
               searching={searching}
               hasMatch={!!activeMatch}
               phase={phase}
+              accent={numberAccent}
               onPlayer={openPlayer}
             />
+            <View style={{ marginTop: spacing.lg }}>
+              <Keypad t={t} s={s} onPress={press} canDelete={number !== ''} searching={searching} />
+            </View>
             <Recents t={t} s={s} recents={recents} onPlayer={openPlayer} />
           </>
         )}
@@ -980,6 +984,7 @@ function ResultCard({
   searching,
   hasMatch,
   phase,
+  accent,
   onPlayer,
 }: {
   t: Theme;
@@ -989,10 +994,12 @@ function ResultCard({
   searching: boolean;
   hasMatch: boolean;
   phase: Phase;
+  accent: string;
   onPlayer: (hit: PlayerHit) => void;
 }) {
   const { tr } = useLang();
-  let icon = <MaterialCommunityIcons name="tshirt-crew" size={26} color={t.onPrimary} />;
+  const onAccent = contrastText(accent);
+  let icon = <MaterialCommunityIcons name="tshirt-crew" size={26} color={onAccent} />;
   let title = tr('enterNumberTitle');
   let subtitle = tr('nameWillShow');
 
@@ -1009,7 +1016,11 @@ function ResultCard({
         {hits.map((h) => (
           <Pressable
             key={`${h.team_id}-${h.player_id}`}
-            style={({ pressed }) => [s.foundCard, pressed && { opacity: 0.7 }]}
+            style={({ pressed }) => [
+              s.foundCard,
+              { backgroundColor: withAlpha(accent, 0.1), borderWidth: 1, borderColor: withAlpha(accent, 0.3) },
+              pressed && { opacity: 0.7 },
+            ]}
             onPress={() => onPlayer(h)}
           >
             <Avatar t={t} s={s} hit={h} size={52} />
@@ -1017,22 +1028,22 @@ function ResultCard({
               <Text style={s.foundName}>{h.full_name ?? tr('unknownPlayer')}</Text>
               <Text style={s.foundMeta}>{[h.position, h.team].filter(Boolean).join(' · ')}</Text>
             </View>
-            <View style={s.foundBadge}>
-              <Text style={s.foundBadgeText}>{h.jersey_number ?? '?'}</Text>
+            <View style={[s.foundBadge, { backgroundColor: accent }]}>
+              <Text style={[s.foundBadgeText, { color: onAccent }]}>{h.jersey_number ?? '?'}</Text>
             </View>
           </Pressable>
         ))}
       </View>
     );
   } else if (number !== '' && hits && hits.length === 0) {
-    icon = <Ionicons name="help" size={26} color={t.onPrimary} />;
+    icon = <Ionicons name="help" size={26} color={onAccent} />;
     title = tr('noNumberTitle', { n: number });
     subtitle = tr('noNumberSub');
   }
 
   return (
-    <View style={s.placeholder}>
-      <View style={s.placeholderIcon}>{icon}</View>
+    <View style={[s.placeholder, { backgroundColor: withAlpha(accent, 0.1), borderWidth: 1, borderColor: withAlpha(accent, 0.3) }]}>
+      <View style={[s.placeholderIcon, { backgroundColor: accent }]}>{icon}</View>
       <View style={{ flex: 1 }}>
         <Text style={s.placeholderTitle}>{title}</Text>
         <Text style={s.placeholderSub}>{subtitle}</Text>
