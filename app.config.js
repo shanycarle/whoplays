@@ -21,7 +21,7 @@ module.exports = {
       predictiveBackGestureEnabled: false,
     },
     web: {
-      favicon: './assets/favicon.png',
+      favicon: './src/logos/Favicon.png',
       display: 'standalone',
       scope: publicUrl,
       startUrl: publicUrl,
