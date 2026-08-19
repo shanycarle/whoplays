@@ -90,6 +90,7 @@ function Root() {
   const [overrideMatch, setOverrideMatch] = useState<Match | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [installPromptVisible, setInstallPromptVisible] = useState(false);
+  const [canInstall, setCanInstall] = useState(false); // Android/Chromium a offert beforeinstallprompt
   const installPromptRef = useRef<any>(null);
   const [selectedField, setSelectedField] = useState<Field | null>(null);
   // Terrain the user explicitly picked from the header dropdown (overrides geo).
@@ -157,7 +158,7 @@ function Root() {
       setSelected(hit);
       setProfile(null);
       setProfileLoading(true);
-      getPlayer(hit.player_id)
+      getPlayer(hit.player_id, hit.team_id)
         .then(setProfile)
         .catch(() => setProfile(null))
         .finally(() => setProfileLoading(false));
@@ -229,11 +230,13 @@ function Root() {
     const handleBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
       installPromptRef.current = event;
+      setCanInstall(true);
       showInstallPrompt();
     };
 
     const handleAppInstalled = () => {
       installPromptRef.current = null;
+      setCanInstall(false);
       setInstallPromptVisible(false);
     };
 
@@ -483,6 +486,19 @@ function Root() {
       <BetaWelcomeModal
         visible={installPromptVisible}
         onClose={() => setInstallPromptVisible(false)}
+        canInstall={canInstall}
+        onInstall={async () => {
+          const promptEvent = installPromptRef.current;
+          if (!promptEvent) return;
+          promptEvent.prompt();
+          try {
+            await promptEvent.userChoice;
+          } catch {
+            // l'utilisateur a fermé la fenêtre — on ne fait rien
+          }
+          installPromptRef.current = null;
+          setCanInstall(false);
+        }}
         t={t}
         s={s}
       />
@@ -490,7 +506,7 @@ function Root() {
   );
 }
 
-function BetaWelcomeModal({ visible, onClose, t, s }: { visible: boolean; onClose: () => void; t: Theme; s: Styles }) {
+function BetaWelcomeModal({ visible, onClose, canInstall, onInstall, t, s }: { visible: boolean; onClose: () => void; canInstall: boolean; onInstall: () => void; t: Theme; s: Styles }) {
   if (Platform.OS !== 'web') return null;
 
   return (
@@ -591,6 +607,27 @@ function BetaWelcomeModal({ visible, onClose, t, s }: { visible: boolean; onClos
                 du plein écran et faire disparaître la barre d’adresse du navigateur.
               </Text>
             </View>
+
+            {/* One-tap install (Android/Chromium only — the event never fires on iOS) */}
+            {canInstall && (
+              <Pressable
+                onPress={onInstall}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  borderRadius: radius.md,
+                  paddingVertical: spacing.md,
+                  backgroundColor: t.secondary,
+                }}
+              >
+                <Ionicons name="download-outline" size={18} color={t.onSecondary} />
+                <Text style={{ color: t.onSecondary, fontWeight: '800', fontSize: 15 }}>
+                  Ajouter à l’écran d’accueil
+                </Text>
+              </Pressable>
+            )}
           </ScrollView>
 
           <Pressable
@@ -1023,7 +1060,7 @@ function ResultCard({
             ]}
             onPress={() => onPlayer(h)}
           >
-            <Avatar t={t} s={s} hit={h} size={52} />
+            <Avatar t={t} s={s} hit={h} size={52} bg={accent} />
             <View style={{ flex: 1 }}>
               <Text style={s.foundName}>{h.full_name ?? tr('unknownPlayer')}</Text>
               <Text style={s.foundMeta}>{[h.position, h.team].filter(Boolean).join(' · ')}</Text>
@@ -1089,7 +1126,40 @@ function Recents({
   );
 }
 
-function Avatar({ t, s, hit, size }: { t: Theme; s: Styles; hit: PlayerHit; size: number }) {
+// Focal-crop metadata for player photos, keyed by photo_path. Lets one full-body
+// photo render as a tight round face crop in the avatars while the same file is
+// shown in full when tapped. x/y = focal point (fraction of the image),
+// cover = fraction of the image HEIGHT that fills the circle, ratio = w/h.
+const PHOTO_FOCUS: Record<string, { x: number; y: number; cover: number; ratio: number }> = {
+  'img/albert-carle-87.jpg': { x: 0.52, y: 0.2, cover: 0.34, ratio: 651 / 911 },
+};
+
+/** Circular player photo. When a focal point is known, zooms/crops to the face;
+ * otherwise falls back to a plain centered image. */
+function PlayerPhoto({ uri, size }: { uri: string; size: number }) {
+  const focus = PHOTO_FOCUS[uri];
+  if (!focus) {
+    return <Image source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
+  }
+  const dispH = size / focus.cover;
+  const dispW = dispH * focus.ratio;
+  return (
+    <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden' }}>
+      <Image
+        source={{ uri }}
+        style={{
+          position: 'absolute',
+          width: dispW,
+          height: dispH,
+          left: size / 2 - focus.x * dispW,
+          top: size / 2 - focus.y * dispH,
+        }}
+      />
+    </View>
+  );
+}
+
+function Avatar({ t, s, hit, size, bg }: { t: Theme; s: Styles; hit: PlayerHit; size: number; bg?: string }) {
   const initials = (hit.full_name ?? '?')
     .split(' ')
     .map((w) => w[0])
@@ -1097,11 +1167,19 @@ function Avatar({ t, s, hit, size }: { t: Theme; s: Styles; hit: PlayerHit; size
     .join('')
     .toUpperCase();
   return (
-    <View style={[s.avatarWrap, { width: size, height: size, borderRadius: size / 2 }]}>
+    <View
+      style={[
+        s.avatarWrap,
+        { width: size, height: size, borderRadius: size / 2 },
+        bg != null && { backgroundColor: bg },
+      ]}
+    >
       {hit.photo_path ? (
-        <Image source={{ uri: hit.photo_path }} style={{ width: size, height: size, borderRadius: size / 2 }} />
+        <PlayerPhoto uri={hit.photo_path} size={size} />
       ) : (
-        <Text style={[s.avatarInitials, { fontSize: size * 0.36 }]}>{initials}</Text>
+        <Text style={[s.avatarInitials, { fontSize: size * 0.36 }, bg != null && { color: contrastText(bg) }]}>
+          {initials}
+        </Text>
       )}
       <View style={s.avatarBadge}>
         <Text style={s.avatarBadgeText}>{hit.jersey_number ?? '?'}</Text>
@@ -2092,6 +2170,19 @@ function cmToFtIn(cm: number): string {
   return `${ft}'${inch}"`;
 }
 
+/** ISO 'YYYY-MM-DD' → 'DD/MM/YYYY' (leaves anything else untouched). */
+function fmtDate(iso?: string | null): string {
+  if (!iso) return '';
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : iso;
+}
+
+/** Normalize an Instagram handle/URL to a full profile URL. */
+function instagramUrl(handle: string): string {
+  const h = handle.trim().replace(/^@/, '');
+  return /^https?:\/\//i.test(h) ? h : `https://instagram.com/${h}`;
+}
+
 function PlayerDetailModal({
   t,
   s,
@@ -2108,12 +2199,77 @@ function PlayerDetailModal({
   onClose: () => void;
 }) {
   const { tr } = useLang();
+  const [showFull, setShowFull] = useState(false);
   // Prefer the tapped context (hit) for the badge/team, profile for the rest.
   const number = hit?.jersey_number ?? profile?.jersey_number ?? null;
   const name = hit?.full_name ?? profile?.full_name ?? '—';
   const photo = profile?.photo_path ?? hit?.photo_path ?? null;
+  const p = profile;
+  const position = hit?.position ?? p?.position ?? null;
+  const teamName = hit?.team ?? p?.team ?? null;
+
+  const ic = (node: ReactNode): ReactNode => node;
+  type Info = { key: string; icon: ReactNode; label: string; value: string; sub?: string };
+  const mk = (
+    key: string,
+    present: unknown,
+    icon: ReactNode,
+    label: string,
+    value: string,
+    sub?: string,
+  ): Info | null =>
+    present != null && present !== '' ? { key, icon, label, value, sub } : null;
+  const keep = (items: (Info | null)[]): Info[] => items.filter((x): x is Info => x !== null);
+
+  // Grouped so each section only appears when it has at least one field.
+  const sportItems = keep([
+    mk('position', position, ic(<MaterialCommunityIcons name="run-fast" size={19} color={t.primary} />), tr('position'), String(position ?? '')),
+    mk('secpos', p?.secondary_positions, ic(<Ionicons name="swap-horizontal" size={19} color={t.primary} />), tr('secondaryPositions'), String(p?.secondary_positions ?? '')),
+    mk('exp', p?.years_experience, ic(<Ionicons name="time-outline" size={19} color={t.primary} />), tr('experience'), tr('seasonsN', { n: p?.years_experience ?? 0 })),
+    mk('team', teamName, ic(<Ionicons name="people-outline" size={19} color={t.primary} />), tr('team'), String(teamName ?? '')),
+  ]);
+
+  const identityItems = keep([
+    mk('age', p?.age, ic(<Ionicons name="hourglass-outline" size={19} color={t.primary} />), tr('age'), tr('yearsOld', { n: p?.age ?? 0 })),
+    mk('bd', p?.birthdate, ic(<Ionicons name="calendar-outline" size={19} color={t.primary} />), tr('birthdate'), fmtDate(p?.birthdate)),
+    mk('gender', p?.gender, ic(<Ionicons name="male-female-outline" size={19} color={t.primary} />), tr('gender'), String(p?.gender ?? '')),
+    mk('home', p?.hometown, ic(<Ionicons name="home-outline" size={19} color={t.primary} />), tr('hometown'), String(p?.hometown ?? '')),
+  ]);
+
+  const dashMeasure = !!p?.hide_measurements;
+  const measureItems = keep([
+    dashMeasure
+      ? { key: 'h', icon: ic(<MaterialCommunityIcons name="human-male-height" size={19} color={t.primary} />), label: tr('height'), value: '—' }
+      : mk('h', p?.height_cm, ic(<MaterialCommunityIcons name="human-male-height" size={19} color={t.primary} />), tr('height'), `${p?.height_cm} cm`, p?.height_cm ? cmToFtIn(p.height_cm) : undefined),
+    dashMeasure
+      ? { key: 'w', icon: ic(<MaterialCommunityIcons name="weight" size={19} color={t.primary} />), label: tr('weight'), value: '—' }
+      : mk('w', p?.weight_kg, ic(<MaterialCommunityIcons name="weight" size={19} color={t.primary} />), tr('weight'), `${p?.weight_kg} kg`, p?.weight_kg ? `${Math.round(p.weight_kg * 2.205)} lb` : undefined),
+    mk('build', p?.build, ic(<MaterialCommunityIcons name="arm-flex-outline" size={19} color={t.primary} />), tr('corpulence'), String(p?.build ?? '')),
+  ]);
+
+  const academicItems = keep([
+    mk('school', p?.school, ic(<Ionicons name="school-outline" size={19} color={t.primary} />), tr('school'), String(p?.school ?? '')),
+    mk('study', p?.study_field, ic(<Ionicons name="book-outline" size={19} color={t.primary} />), tr('studyField'), String(p?.study_field ?? '')),
+    mk('year', p?.school_year, ic(<Ionicons name="calendar-number-outline" size={19} color={t.primary} />), tr('year'), String(p?.school_year ?? '')),
+    mk('prog', p?.discipline, ic(<Ionicons name="ribbon-outline" size={19} color={t.primary} />), tr('discipline'), String(p?.discipline ?? '')),
+  ]);
+
+  const links = keep([
+    p?.instagram ? { key: 'ig', icon: ic(<Ionicons name="logo-instagram" size={20} color={t.primary} />), label: 'Instagram', value: instagramUrl(p.instagram) } : null,
+    p?.hudl_url ? { key: 'hudl', icon: ic(<MaterialCommunityIcons name="play-box-outline" size={20} color={t.primary} />), label: 'Hudl', value: p.hudl_url } : null,
+    p?.highlight_url ? { key: 'hl', icon: ic(<Ionicons name="videocam-outline" size={20} color={t.primary} />), label: tr('highlightVideo'), value: p.highlight_url } : null,
+  ]);
+
+  const grid = (items: Info[]) => (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+      {items.map((it) => (
+        <InfoItem key={it.key} t={t} s={s} half icon={it.icon} label={it.label} value={it.value} sub={it.sub} />
+      ))}
+    </View>
+  );
 
   return (
+    <>
     <Modal visible={!!hit} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={s.zoomBackdrop} onPress={onClose}>
         <Pressable style={s.zoomCard} onPress={() => {}}>
@@ -2125,7 +2281,9 @@ function PlayerDetailModal({
             <View style={s.zoomHeader}>
               <View style={s.zoomAvatarWrap}>
                 {photo ? (
-                  <Image source={{ uri: photo }} style={s.zoomAvatar} />
+                  <Pressable onPress={() => setShowFull(true)} hitSlop={4}>
+                    <PlayerPhoto uri={photo} size={84} />
+                  </Pressable>
                 ) : (
                   <View style={[s.zoomAvatar, s.zoomAvatarFallback]}>
                     <Text style={s.zoomInitials}>{initials(name)}</Text>
@@ -2139,21 +2297,70 @@ function PlayerDetailModal({
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={s.zoomName}>{name}</Text>
+                {!!p?.nickname && (
+                  <Text style={{ color: t.muted, marginTop: 2, fontWeight: '600' }}>« {p.nickname} »</Text>
+                )}
+                {!!teamName && (
+                  <Text style={{ color: t.secondary, marginTop: 4, fontWeight: '700' }}>{teamName}</Text>
+                )}
               </View>
             </View>
 
             {loading && <ActivityIndicator color={t.primary} style={{ marginVertical: spacing.md }} />}
 
-            <View style={[s.infoRow, { marginTop: spacing.lg }]}>
-              <InfoItem t={t} s={s} flex icon={<MaterialCommunityIcons name="tshirt-crew-outline" size={20} color={t.primary} />}
-                label={tr('number')} value={number != null ? String(number) : '—'} />
-              <InfoItem t={t} s={s} flex icon={<Ionicons name="home-outline" size={19} color={t.primary} />}
-                label={tr('hometown')} value="Trois-Rivières" />
-            </View>
+            {sportItems.length > 0 && <Section t={t} s={s} title={tr('sportInfo')}>{grid(sportItems)}</Section>}
+            {identityItems.length > 0 && <Section t={t} s={s} title={tr('otherInfo')}>{grid(identityItems)}</Section>}
+            {measureItems.length > 0 && <Section t={t} s={s} title={tr('measurements')}>{grid(measureItems)}</Section>}
+            {academicItems.length > 0 && <Section t={t} s={s} title={tr('academicInfo')}>{grid(academicItems)}</Section>}
+
+            {!!p?.bio && (
+              <Section t={t} s={s} title={tr('biography')}>
+                <Text style={[s.infoValue, { lineHeight: 20 }]}>{p.bio}</Text>
+              </Section>
+            )}
+            {!!p?.accolades && (
+              <Section t={t} s={s} title={tr('honors')}>
+                <Text style={[s.infoValue, { lineHeight: 20 }]}>{p.accolades}</Text>
+              </Section>
+            )}
+
+            {links.length > 0 && (
+              <Section t={t} s={s} title={tr('links')}>
+                {links.map((l) => (
+                  <Pressable
+                    key={l.key}
+                    onPress={() => Linking.openURL(l.value).catch(() => {})}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm }}
+                  >
+                    {l.icon}
+                    <Text style={{ color: t.primary, fontWeight: '700', flex: 1 }} numberOfLines={1}>{l.label}</Text>
+                    <Ionicons name="open-outline" size={16} color={t.muted} />
+                  </Pressable>
+                ))}
+              </Section>
+            )}
+
+            {!loading && sportItems.length === 0 && identityItems.length === 0 &&
+              measureItems.length === 0 && academicItems.length === 0 &&
+              links.length === 0 && !p?.bio && !p?.accolades && (
+                <Text style={{ color: t.muted, textAlign: 'center', marginVertical: spacing.lg }}>—</Text>
+              )}
           </ScrollView>
         </Pressable>
       </Pressable>
     </Modal>
+
+    {!!photo && (
+      <Modal visible={showFull} transparent animationType="fade" onRequestClose={() => setShowFull(false)}>
+        <Pressable style={s.fullPhotoBackdrop} onPress={() => setShowFull(false)}>
+          <Image source={{ uri: photo }} style={s.fullPhotoImg} resizeMode="contain" />
+          <Pressable style={s.fullPhotoClose} onPress={() => setShowFull(false)} hitSlop={10}>
+            <Ionicons name="close" size={22} color="#FFFFFF" />
+          </Pressable>
+        </Pressable>
+      </Modal>
+    )}
+    </>
   );
 }
 
@@ -2502,6 +2709,16 @@ function makeStyles(t: Theme) {
     zoomClose: {
       position: 'absolute', top: spacing.md, right: spacing.md, zIndex: 2,
       width: 30, height: 30, borderRadius: 15, backgroundColor: t.primary,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    fullPhotoBackdrop: {
+      flex: 1, backgroundColor: 'rgba(0,0,0,0.92)',
+      alignItems: 'center', justifyContent: 'center', padding: spacing.md,
+    },
+    fullPhotoImg: { width: '100%', height: '100%' },
+    fullPhotoClose: {
+      position: 'absolute', top: spacing.lg, right: spacing.lg, zIndex: 2,
+      width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.55)',
       alignItems: 'center', justifyContent: 'center',
     },
     zoomHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingRight: 34 },

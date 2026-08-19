@@ -75,6 +75,7 @@ export type LineupEntry = {
   jersey_number: number | null;
   position: string | null;
   is_starter: boolean;
+  photo_path?: string | null;
 };
 
 export type Lineup = {
@@ -116,16 +117,35 @@ export type PlayerProfile = {
   team: string | null;
   position: string | null;
   jersey_number: number | null;
-  numbers: number[];
+  // Identité
+  nickname?: string | null;
   age: number | null;
   birthdate: string | null;
-  school_year: string | null;
-  side: string | null;
+  gender?: string | null;
+  hometown: string | null;
+  // Sportif
+  secondary_positions?: string | null;
+  years_experience?: number | null;
+  // Physique
   height_cm: number | null;
   weight_kg: number | null;
   build: string | null;
+  hide_measurements?: boolean | null; // affiche « — » au lieu des valeurs
+
+  // Académique
+  school?: string | null;
+  study_field?: string | null;
+  school_year: string | null;
   discipline: string | null;
-  hometown: string | null;
+  // Bio / médias
+  bio?: string | null;
+  instagram?: string | null;
+  highlight_url?: string | null;
+  hudl_url?: string | null;
+  accolades?: string | null;
+  // Retirés côté API (gardés optionnels pour compat) :
+  numbers?: number[];
+  side?: string | null;
 };
 
 export type PlayerHit = {
@@ -146,15 +166,15 @@ export class ApiError extends Error {
   }
 }
 
-// ---- Mock data (Bills/Bucs juniors + Seahawks/Pats seniors) ----
+// ---- Mock data (Vert et Or/Estacades juniors + Seahawks/Pats seniors) ----
 const MOCK_JUNIORS_TEAM_BILLS: Team = {
   id: 3,
-  name: 'Bills',
+  name: 'Vert et Or',
   category: 'Juniors',
   division: null,
-  logo_path: null,
-  color_primary: '#00338D',
-  color_secondary: '#C60C30',
+  logo_path: 'img/vert-et-or.png',
+  color_primary: '#235b3b',
+  color_secondary: '#bf9800',
   sport: 'football',
   sport_label: 'Football',
   players_count: 36,
@@ -162,12 +182,12 @@ const MOCK_JUNIORS_TEAM_BILLS: Team = {
 
 const MOCK_JUNIORS_TEAM_BUCS: Team = {
   id: 4,
-  name: 'Bucs',
+  name: 'Estacades',
   category: 'Juniors',
   division: null,
-  logo_path: null,
-  color_primary: '#D0103A',
-  color_secondary: '#FF8200',
+  logo_path: 'img/estacades.jpg',
+  color_primary: '#0f2a3f',
+  color_secondary: '#b1987a',
   sport: 'football',
   sport_label: 'Football',
   players_count: 38,
@@ -233,8 +253,8 @@ const MOCK_JUNIORS_MATCH: Match = {
       'img/stade-gilles-doucet-2.png',
     ],
   },
-  home_team: MOCK_JUNIORS_TEAM_BILLS,
-  away_team: MOCK_JUNIORS_TEAM_BUCS,
+  home_team: MOCK_JUNIORS_TEAM_BUCS,
+  away_team: MOCK_JUNIORS_TEAM_BILLS,
   lineups: [
     {
       id: 1,
@@ -242,6 +262,7 @@ const MOCK_JUNIORS_MATCH: Match = {
       formation: '4-3-3',
       published_at: '2026-07-03T12:30:00Z',
       entries: [
+        { player_id: 199, full_name: 'Albert Carle', jersey_number: 87, position: 'Receveur', is_starter: true, photo_path: 'img/albert-carle-87.jpg' },
         { player_id: 100, full_name: 'Emile Grenier', jersey_number: 7, position: 'Quarterback', is_starter: true },
         { player_id: 101, full_name: 'Justin Provencher', jersey_number: 5, position: 'Running Back', is_starter: true },
         { player_id: 102, full_name: 'Lyhan Ouellette', jersey_number: 3, position: 'Running Back', is_starter: true },
@@ -497,7 +518,7 @@ export async function findPlayerByNumber(
                 position: entry.position,
                 team: team?.name ?? null,
                 team_id: team?.id ?? 0,
-                photo_path: null,
+                photo_path: entry.photo_path ?? null,
               });
             }
           }
@@ -518,8 +539,35 @@ export async function findPlayerByNumber(
   }
 }
 
+// Per-player profile overrides for the demo (keyed by player_id). Anything set
+// here wins over the generic mock profile; null values hide a field.
+const MOCK_PROFILE_OVERRIDES: Record<number, Partial<PlayerProfile>> = {
+  199: {
+    nickname: 'Alberto',
+    age: 13,
+    birthdate: '2012-12-09',
+    gender: 'Masculin',
+    hometown: 'Trois-Rivières',
+    secondary_positions: 'Retourneur de bottés',
+    years_experience: 1,
+    height_cm: null,
+    weight_kg: null,
+    build: null,
+    hide_measurements: true,
+    school: 'École primaire Bois-Joli',
+    study_field: null,
+    school_year: null,
+    discipline: null,
+    bio: 'Albert est aussi membre du Vert et Or Basketball, Futsal ainsi que joueur de hockey pour OHMTRO.',
+    instagram: null,
+    hudl_url: null,
+    highlight_url: null,
+    accolades: null,
+  },
+};
+
 /** GET /players/{id} — full profile for the zoom popup. */
-export async function getPlayer(id: number): Promise<PlayerProfile> {
+export async function getPlayer(id: number, teamId?: number): Promise<PlayerProfile> {
   if (USE_MOCK_DATA) {
     for (const match of MATCHES) {
       if (match.lineups) {
@@ -530,20 +578,30 @@ export async function getPlayer(id: number): Promise<PlayerProfile> {
               return {
                 id,
                 full_name: entry.full_name,
-                photo_path: null,
+                photo_path: entry.photo_path ?? null,
                 team: lineup.team?.name ?? null,
                 position: entry.position,
                 jersey_number: entry.jersey_number,
-                numbers: entry.jersey_number ? [entry.jersey_number] : [],
-                age: 28,
-                birthdate: '1998-01-01',
-                school_year: null,
-                side: 'Droit',
+                nickname: 'Flash',
+                age: 17,
+                birthdate: '2008-03-14',
+                gender: 'Masculin',
+                hometown: 'Trois-Rivières',
+                secondary_positions: 'RB, WR',
+                years_experience: 3,
                 height_cm: 180,
                 weight_kg: 80,
                 build: 'Athlétique',
+                school: 'Séminaire St-Joseph',
+                study_field: 'Sciences de la nature',
+                school_year: 'Sec. 5',
                 discipline: 'Football',
-                hometown: 'Montréal',
+                bio: 'Joueur polyvalent reconnu pour sa vitesse et son leadership sur le terrain.',
+                instagram: 'flash.tremblay',
+                hudl_url: 'https://www.hudl.com/profile/exemple',
+                highlight_url: 'https://youtu.be/dQw4w9WgXcQ',
+                accolades: 'Recrue de l’année 2024 · Équipe d’étoiles régionale',
+                ...(MOCK_PROFILE_OVERRIDES[id] ?? {}),
               };
             }
           }
@@ -572,7 +630,10 @@ export async function getPlayer(id: number): Promise<PlayerProfile> {
     };
   }
 
-  const res = await request<{ data: PlayerProfile }>(`/players/${id}`);
+  // Pass the team the spectator came from so the API can apply that team's
+  // visible_player_fields (a player may belong to several teams).
+  const qs = teamId != null ? `?team=${teamId}` : '';
+  const res = await request<{ data: PlayerProfile }>(`/players/${id}${qs}`);
   return res.data;
 }
 
