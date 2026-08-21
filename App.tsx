@@ -403,28 +403,33 @@ function Root() {
             </Pressable>
           </View>
 
-          {/* Active match, shown as its own block */}
-          {(phase === 'ready' || overrideMatch) && activeMatch && (
-            <MatchupBanner
-              t={t}
-              s={s}
-              match={activeMatch}
-              selectedTeamId={selectedTeamId}
-              onSelectTeam={(id) => {
-                hapticSelect();
-                setSelectedTeamId((prev) => (prev === id ? null : id));
-              }}
-            />
+          {/* Match banner + number/name input only make sense on the search tab. */}
+          {tab === 'search' && (
+            <>
+              {/* Active match, shown as its own block */}
+              {(phase === 'ready' || overrideMatch) && activeMatch && (
+                <MatchupBanner
+                  t={t}
+                  s={s}
+                  match={activeMatch}
+                  selectedTeamId={selectedTeamId}
+                  onSelectTeam={(id) => {
+                    hapticSelect();
+                    setSelectedTeamId((prev) => (prev === id ? null : id));
+                  }}
+                />
+              )}
+
+              {/* Title BELOW the match info, then the big number display */}
+              <View style={s.titleRow}>
+                <View style={s.titleLine} />
+                <Text style={s.title}>{searchMode === 'alpha' ? tr('findByName') : tr('findByNumber')}</Text>
+                <View style={s.titleLine} />
+              </View>
+
+              <NumberDisplay t={t} s={s} value={number} accent={numberAccent} mode={searchMode} />
+            </>
           )}
-
-          {/* Title BELOW the match info, then the big number display */}
-          <View style={s.titleRow}>
-            <View style={s.titleLine} />
-            <Text style={s.title}>{searchMode === 'alpha' ? tr('findByName') : tr('findByNumber')}</Text>
-            <View style={s.titleLine} />
-          </View>
-
-          <NumberDisplay t={t} s={s} value={number} accent={numberAccent} mode={searchMode} />
         </View>
       </SafeAreaView>
 
