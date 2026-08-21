@@ -25,9 +25,11 @@ import { hapticSelect, hapticSuccess, hapticTap, hapticWarning } from './src/hap
 import { SWATCHES, spacing, radius, withAlpha, contrastText, type Theme } from './src/theme';
 import {
   ApiError,
+  findPlayerByName,
   findPlayerByNumber,
   getPlayer,
   getTeam,
+  listOrganizations,
   listRegions,
   nearbyMatches,
   resolveGeo,
@@ -37,11 +39,14 @@ import {
   type Field,
   type GeoResolveResult,
   type Match,
+  type Organization,
   type PlayerHit,
   type PlayerProfile,
   type RosterPlayer,
   type Team,
 } from './src/api';
+
+const ONBOARDED_KEY = 'whoplays.onboarded.v1';
 
 const RECENTS_KEY = 'whoplays.recents.v1';
 const DEMO_COORDS = { lat: 45.559, lng: -73.554 };
@@ -79,6 +84,7 @@ function Root() {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   const [number, setNumber] = useState('');
+  const [searchMode, setSearchMode] = useState<'num' | 'alpha'>('num'); // pavé numérique ou clavier lettres
   const [hits, setHits] = useState<PlayerHit[] | null>(null);
   const [searching, setSearching] = useState(false);
   const queryId = useRef(0);
@@ -89,6 +95,8 @@ function Root() {
   // A match picked from the Calendrier tab overrides the geo-detected active match.
   const [overrideMatch, setOverrideMatch] = useState<Match | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [profileInvite, setProfileInvite] = useState(false); // bannière d'invitation (1er lancement)
+  const [onboarded, setOnboarded] = useState(true); // true par défaut → pas de flash avant lecture
   const [installPromptVisible, setInstallPromptVisible] = useState(false);
   const [canInstall, setCanInstall] = useState(false); // Android/Chromium a offert beforeinstallprompt
   const installPromptRef = useRef<any>(null);
@@ -213,6 +221,13 @@ function Root() {
     void locate();
   }, [locate]);
 
+  // First-launch flag: drives the auto-open of the customization sheet.
+  useEffect(() => {
+    AsyncStorage.getItem(ONBOARDED_KEY)
+      .then((v) => { if (v !== '1') setOnboarded(false); })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (Platform.OS !== 'web') return;
 
@@ -298,12 +313,21 @@ function Root() {
   // ---- search ----
   const runSearch = useCallback(
     async (remember: boolean) => {
-      const n = parseInt(number, 10);
-      if (!activeMatch || number === '' || Number.isNaN(n)) return;
+      if (!activeMatch || number === '') return;
       const id = ++queryId.current;
       setSearching(true);
       try {
-        const res = await findPlayerByNumber(activeMatch.id, n);
+        let res: PlayerHit[];
+        if (searchMode === 'alpha') {
+          res = await findPlayerByName(activeMatch.id, number);
+        } else {
+          const n = parseInt(number, 10);
+          if (Number.isNaN(n)) {
+            if (id === queryId.current) { setHits([]); setSearching(false); }
+            return;
+          }
+          res = await findPlayerByNumber(activeMatch.id, n);
+        }
         if (id !== queryId.current) return;
         setHits(res);
         // Match what the user actually sees (team filter applied).
@@ -322,7 +346,7 @@ function Root() {
         if (id === queryId.current) setSearching(false);
       }
     },
-    [number, activeMatch, addRecent, selectedTeamId],
+    [number, searchMode, activeMatch, addRecent, selectedTeamId],
   );
 
   // Live preview as the number is typed (debounced); explicit button "remembers".
@@ -339,7 +363,17 @@ function Root() {
     hapticTap();
     if (key === 'del') setNumber((n) => n.slice(0, -1));
     else if (key === 'search') void runSearch(true);
-    else if (number.length < 2) setNumber((n) => n + key);
+    else if (searchMode === 'alpha') {
+      if (number.length < 16) setNumber((n) => n + key);
+    } else if (number.length < 2) setNumber((n) => n + key);
+  };
+
+  // Toggle numeric ↔ alphabetic keypad; clears the field so digits/letters never mix.
+  const toggleSearchMode = () => {
+    hapticSelect();
+    setSearchMode((m) => (m === 'num' ? 'alpha' : 'num'));
+    setNumber('');
+    setHits(null);
   };
 
   return (
@@ -364,7 +398,7 @@ function Root() {
                 setFieldPickerOpen(true);
               }}
             />
-            <Pressable onPress={() => setProfileOpen(true)} hitSlop={10} style={s.profileBtn}>
+            <Pressable onPress={() => { setProfileInvite(false); setProfileOpen(true); }} hitSlop={10} style={s.profileBtn}>
               <Ionicons name="person-circle" size={32} color={t.secondary} />
             </Pressable>
           </View>
@@ -386,11 +420,11 @@ function Root() {
           {/* Title BELOW the match info, then the big number display */}
           <View style={s.titleRow}>
             <View style={s.titleLine} />
-            <Text style={s.title}>{tr('findByNumber')}</Text>
+            <Text style={s.title}>{searchMode === 'alpha' ? tr('findByName') : tr('findByNumber')}</Text>
             <View style={s.titleLine} />
           </View>
 
-          <NumberDisplay t={t} s={s} value={number} accent={numberAccent} />
+          <NumberDisplay t={t} s={s} value={number} accent={numberAccent} mode={searchMode} />
         </View>
       </SafeAreaView>
 
@@ -406,21 +440,37 @@ function Root() {
           <StubScreen t={t} s={s} label={tr(TABS.find((x) => x.key === tab)!.labelKey as never)} />
         ) : (
           <>
-            {/* Result sits directly above the keypad — closer to the number/search loop */}
-            <ResultCard
-              t={t}
-              s={s}
-              number={number}
-              hits={displayedHits}
-              searching={searching}
-              hasMatch={!!activeMatch}
-              phase={phase}
-              accent={numberAccent}
-              onPlayer={openPlayer}
-            />
-            <View style={{ marginTop: spacing.lg }}>
-              <Keypad t={t} s={s} onPress={press} canDelete={number !== ''} searching={searching} />
-            </View>
+            {(() => {
+              const results = (
+                <ResultCard
+                  t={t}
+                  s={s}
+                  number={number}
+                  mode={searchMode}
+                  hits={displayedHits}
+                  searching={searching}
+                  hasMatch={!!activeMatch}
+                  phase={phase}
+                  accent={numberAccent}
+                  onPlayer={openPlayer}
+                />
+              );
+              const keypad = (
+                <Keypad t={t} s={s} onPress={press} canDelete={number !== ''} searching={searching} mode={searchMode} onToggleMode={toggleSearchMode} />
+              );
+              // By name: keypad on top, results scroll below. By number: results on top of the keypad.
+              return searchMode === 'alpha' ? (
+                <>
+                  {keypad}
+                  <View style={{ marginTop: spacing.lg }}>{results}</View>
+                </>
+              ) : (
+                <>
+                  {results}
+                  <View style={{ marginTop: spacing.lg }}>{keypad}</View>
+                </>
+              );
+            })()}
             <Recents t={t} s={s} recents={recents} onPlayer={openPlayer} />
           </>
         )}
@@ -447,7 +497,8 @@ function Root() {
 
       <ProfileModal
         visible={profileOpen}
-        onClose={() => setProfileOpen(false)}
+        invite={profileInvite}
+        onClose={() => { setProfileInvite(false); setProfileOpen(false); }}
         onDemo={() => {
           setProfileOpen(false);
           void locate(DEMO_COORDS);
@@ -485,7 +536,16 @@ function Root() {
 
       <BetaWelcomeModal
         visible={installPromptVisible}
-        onClose={() => setInstallPromptVisible(false)}
+        onClose={() => {
+          setInstallPromptVisible(false);
+          // Premier lancement : on invite tout de suite à personnaliser l'app.
+          if (!onboarded) {
+            setOnboarded(true);
+            AsyncStorage.setItem(ONBOARDED_KEY, '1').catch(() => {});
+            setProfileInvite(true);
+            setProfileOpen(true);
+          }
+        }}
         canInstall={canInstall}
         onInstall={async () => {
           const promptEvent = installPromptRef.current;
@@ -670,7 +730,7 @@ function Logo({ t, s }: { t: Theme; s: Styles }) {
  * No grey label — the section title already says what it is. The digits take the
  * targeted team's color, with a blinking caret to show the keypad "writes" here.
  */
-function NumberDisplay({ t, s, value, accent }: { t: Theme; s: Styles; value: string; accent: string }) {
+function NumberDisplay({ t, s, value, accent, mode }: { t: Theme; s: Styles; value: string; accent: string; mode: 'num' | 'alpha' }) {
   const blink = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     const loop = Animated.loop(
@@ -684,8 +744,24 @@ function NumberDisplay({ t, s, value, accent }: { t: Theme; s: Styles; value: st
   }, [blink]);
 
   const isEmpty = value === '';
-  const chars = isEmpty ? ['0', '0'] : value.split('');
 
+  if (mode === 'alpha') {
+    return (
+      <View style={s.numDisp}>
+        <View style={[s.numJersey, { backgroundColor: withAlpha(accent, 0.14) }]}>
+          <Ionicons name="person" size={22} color={accent} />
+        </View>
+        <View style={s.numDigits}>
+          <Text style={[s.numName, { color: isEmpty ? withAlpha(t.muted, 0.35) : accent }]} numberOfLines={1}>
+            {isEmpty ? 'Abc' : value}
+          </Text>
+          <Animated.View style={[s.numCaret, { backgroundColor: accent, opacity: blink }]} />
+        </View>
+      </View>
+    );
+  }
+
+  const chars = isEmpty ? ['0', '0'] : value.split('');
   return (
     <View style={s.numDisp}>
       <View style={[s.numJersey, { backgroundColor: withAlpha(accent, 0.14) }]}>
@@ -943,71 +1019,96 @@ function TeamCrest({
   );
 }
 
+const NUM_ROWS = [
+  ['1', '2', '3', 'del'],
+  ['4', '5', '6', '0'],
+  ['7', '8', '9', 'search'],
+];
+// Alphabet in a same-width grid → smaller keys (7 columns instead of 4).
+const ALPHA_ROWS = [
+  ['A', 'B', 'C', 'D', 'E', 'F', 'G'],
+  ['H', 'I', 'J', 'K', 'L', 'M', 'N'],
+  ['O', 'P', 'Q', 'R', 'S', 'T', 'U'],
+  ['V', 'W', 'X', 'Y', 'Z', 'del', 'search'],
+];
+
 function Keypad({
   t,
   s,
   onPress,
   canDelete,
   searching,
+  mode,
+  onToggleMode,
 }: {
   t: Theme;
   s: Styles;
   onPress: (k: string) => void;
   canDelete: boolean;
   searching: boolean;
+  mode: 'num' | 'alpha';
+  onToggleMode: () => void;
 }) {
   const { tr } = useLang();
-  const rows = [
-    ['1', '2', '3', 'del'],
-    ['4', '5', '6', '0'],
-    ['7', '8', '9', 'search'],
-  ];
+  const alpha = mode === 'alpha';
+  const rows = alpha ? ALPHA_ROWS : NUM_ROWS;
+
+  const renderKey = (k: string) => {
+    if (k === 'search') {
+      return (
+        <Pressable
+          key={k}
+          onPress={() => onPress(k)}
+          style={({ pressed }) => [s.key, alpha && s.keySm, s.keySearch, pressed && { opacity: 0.85 }]}
+        >
+          {searching ? (
+            <ActivityIndicator color={t.onSecondary} />
+          ) : alpha ? (
+            <Ionicons name="search" size={18} color={t.onSecondary} />
+          ) : (
+            <>
+              <Ionicons name="search" size={20} color={t.onSecondary} />
+              <Text style={[s.keySearchLabel, { color: t.onSecondary }]}>{tr('searchBtn')}</Text>
+            </>
+          )}
+        </Pressable>
+      );
+    }
+    if (k === 'del') {
+      return (
+        <Pressable
+          key={k}
+          onPress={() => onPress(k)}
+          disabled={!canDelete}
+          style={({ pressed }) => [s.key, alpha && s.keySm, s.keyPlain, pressed && { backgroundColor: '#EFEFEA' }, !canDelete && { opacity: 0.4 }]}
+        >
+          <Ionicons name="backspace-outline" size={alpha ? 20 : 26} color={t.primary} />
+        </Pressable>
+      );
+    }
+    return (
+      <Pressable
+        key={k}
+        onPress={() => onPress(k)}
+        style={({ pressed }) => [s.key, alpha && s.keySm, s.keyPlain, pressed && { backgroundColor: '#EFEFEA' }]}
+      >
+        <Text style={alpha ? s.keyLetter : s.keyNum}>{k}</Text>
+      </Pressable>
+    );
+  };
+
   return (
     <View style={s.keypad}>
+      {/* Toggle numeric ↔ alphabetic (search by name when the number is unknown) */}
+      <View style={s.keypadHeader}>
+        <Text style={s.keypadHint}>{alpha ? tr('findByName') : tr('noNumberHint')}</Text>
+        <Pressable onPress={onToggleMode} hitSlop={8} style={({ pressed }) => [s.modeToggle, pressed && { opacity: 0.7 }]}>
+          <Ionicons name={alpha ? 'keypad-outline' : 'text-outline'} size={15} color={t.primary} />
+          <Text style={s.modeToggleText}>{alpha ? '123' : 'ABC'}</Text>
+        </Pressable>
+      </View>
       {rows.map((row, ri) => (
-        <View key={ri} style={s.keyRow}>
-          {row.map((k) => {
-            if (k === 'search') {
-              return (
-                <Pressable
-                  key={k}
-                  onPress={() => onPress(k)}
-                  style={({ pressed }) => [s.key, s.keySearch, pressed && { opacity: 0.85 }]}
-                >
-                  {searching ? (
-                    <ActivityIndicator color={t.onSecondary} />
-                  ) : (
-                    <>
-                      <Ionicons name="search" size={20} color={t.onSecondary} />
-                      <Text style={[s.keySearchLabel, { color: t.onSecondary }]}>{tr('searchBtn')}</Text>
-                    </>
-                  )}
-                </Pressable>
-              );
-            }
-            if (k === 'del') {
-              return (
-                <Pressable
-                  key={k}
-                  onPress={() => onPress(k)}
-                  disabled={!canDelete}
-                  style={({ pressed }) => [s.key, s.keyPlain, pressed && { backgroundColor: '#EFEFEA' }, !canDelete && { opacity: 0.4 }]}
-                >
-                  <Ionicons name="backspace-outline" size={26} color={t.primary} />
-                </Pressable>
-              );
-            }
-            return (
-              <Pressable
-                key={k}
-                onPress={() => onPress(k)}
-                style={({ pressed }) => [s.key, s.keyPlain, pressed && { backgroundColor: '#EFEFEA' }]}
-              >
-                <Text style={s.keyNum}>{k}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <View key={ri} style={s.keyRow}>{row.map(renderKey)}</View>
       ))}
     </View>
   );
@@ -1017,6 +1118,7 @@ function ResultCard({
   t,
   s,
   number,
+  mode,
   hits,
   searching,
   hasMatch,
@@ -1027,6 +1129,7 @@ function ResultCard({
   t: Theme;
   s: Styles;
   number: string;
+  mode: 'num' | 'alpha';
   hits: PlayerHit[] | null;
   searching: boolean;
   hasMatch: boolean;
@@ -1035,9 +1138,12 @@ function ResultCard({
   onPlayer: (hit: PlayerHit) => void;
 }) {
   const { tr } = useLang();
+  const isAlpha = mode === 'alpha';
   const onAccent = contrastText(accent);
-  let icon = <MaterialCommunityIcons name="tshirt-crew" size={26} color={onAccent} />;
-  let title = tr('enterNumberTitle');
+  let icon = isAlpha
+    ? <Ionicons name="person" size={26} color={onAccent} />
+    : <MaterialCommunityIcons name="tshirt-crew" size={26} color={onAccent} />;
+  let title = isAlpha ? tr('enterNameTitle') : tr('enterNumberTitle');
   let subtitle = tr('nameWillShow');
 
   if (phase === 'ready' && !hasMatch) {
@@ -1045,7 +1151,7 @@ function ResultCard({
     subtitle = tr('approachField');
   } else if (number !== '' && searching && hits == null) {
     title = tr('searchingTitle');
-    subtitle = tr('numberN', { n: number });
+    subtitle = isAlpha ? `« ${number} »` : tr('numberN', { n: number });
   } else if (hits && hits.length > 0) {
     // Found — render rich player rows (numbers containing the typed digits).
     return (
@@ -1074,7 +1180,7 @@ function ResultCard({
     );
   } else if (number !== '' && hits && hits.length === 0) {
     icon = <Ionicons name="help" size={26} color={onAccent} />;
-    title = tr('noNumberTitle', { n: number });
+    title = isAlpha ? tr('noNameTitle', { n: number }) : tr('noNumberTitle', { n: number });
     subtitle = tr('noNumberSub');
   }
 
@@ -1902,8 +2008,10 @@ function AlignementsScreen({ t, s }: { t: Theme; s: Styles }) {
 
 function FieldDetailModal({ t, s, field, onClose }: { t: Theme; s: Styles; field: Field | null; onClose: () => void }) {
   const { tr } = useLang();
+  const [zoomPhoto, setZoomPhoto] = useState<string | null>(null);
   if (!field) return null;
   return (
+    <>
     <Modal visible={!!field} transparent animationType="slide" onRequestClose={onClose}>
       <View style={s.modalBackdrop}>
         <View style={[s.modalSheet, { maxHeight: '85%' }]}>
@@ -1923,7 +2031,9 @@ function FieldDetailModal({ t, s, field, onClose }: { t: Theme; s: Styles; field
 
           <ScrollView contentContainerStyle={{ paddingBottom: spacing.md }}>
             {field.photos && field.photos.length > 0 && (
-              <Image source={{ uri: field.photos[0] }} style={{ width: '100%', height: 180, borderRadius: 8 }} />
+              <Pressable onPress={() => setZoomPhoto(field.photos![0])}>
+                <Image source={{ uri: field.photos[0] }} style={{ width: '100%', height: 180, borderRadius: 8 }} />
+              </Pressable>
             )}
 
             <View style={{ paddingTop: spacing.md, gap: spacing.sm }}>
@@ -1955,7 +2065,9 @@ function FieldDetailModal({ t, s, field, onClose }: { t: Theme; s: Styles; field
             {field.photos && field.photos.length > 1 && (
               <View style={{ marginTop: spacing.md, flexDirection: 'row', gap: spacing.sm }}>
                 {field.photos.slice(1).map((p, i) => (
-                  <Image key={i} source={{ uri: p }} style={{ width: 120, height: 80, borderRadius: 6 }} />
+                  <Pressable key={i} onPress={() => setZoomPhoto(p)}>
+                    <Image source={{ uri: p }} style={{ width: 120, height: 80, borderRadius: 6 }} />
+                  </Pressable>
                 ))}
               </View>
             )}
@@ -1963,6 +2075,16 @@ function FieldDetailModal({ t, s, field, onClose }: { t: Theme; s: Styles; field
         </View>
       </View>
     </Modal>
+
+    <Modal visible={!!zoomPhoto} transparent animationType="fade" onRequestClose={() => setZoomPhoto(null)}>
+      <Pressable style={s.fullPhotoBackdrop} onPress={() => setZoomPhoto(null)}>
+        {!!zoomPhoto && <Image source={{ uri: zoomPhoto }} style={s.fullPhotoImg} resizeMode="contain" />}
+        <Pressable style={s.fullPhotoClose} onPress={() => setZoomPhoto(null)} hitSlop={10}>
+          <Ionicons name="close" size={22} color="#FFFFFF" />
+        </Pressable>
+      </Pressable>
+    </Modal>
+    </>
   );
 }
 
@@ -2046,16 +2168,48 @@ function StubScreen({ t, s, label }: { t: Theme; s: Styles; label: string }) {
 
 function ProfileModal({
   visible,
+  invite,
   onClose,
   onDemo,
 }: {
   visible: boolean;
+  invite?: boolean;
   onClose: () => void;
   onDemo: () => void;
 }) {
-  const { theme: t, palette, setPrimary, setSecondary, reset } = useTheme();
+  const { theme: t, palette, setPrimary, setSecondary, setColors, reset } = useTheme();
   const { tr, lang, setLang } = useLang();
   const s = useMemo(() => makeStyles(t), [t]);
+
+  const [orgs, setOrgs] = useState<Organization[]>([]);
+  const [orgOpen, setOrgOpen] = useState(false);
+  const [selectedOrgId, setSelectedOrgId] = useState<number | null>(null);
+
+  // Load the organizations once; pre-select one if it matches the current colors.
+  useEffect(() => {
+    let active = true;
+    listOrganizations()
+      .then((list) => {
+        if (!active) return;
+        setOrgs(list);
+        const match = list.find(
+          (o) =>
+            o.color_primary?.toLowerCase() === palette.primary.toLowerCase() &&
+            o.color_secondary?.toLowerCase() === palette.secondary.toLowerCase(),
+        );
+        if (match) setSelectedOrgId(match.id);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  const selectedOrg = orgs.find((o) => o.id === selectedOrgId) ?? null;
+  const dot = (hex: string | null, shift?: boolean) => (
+    <View style={{
+      width: 16, height: 16, borderRadius: 8, backgroundColor: hex ?? '#ccc',
+      borderWidth: 1, borderColor: 'rgba(0,0,0,0.18)', marginLeft: shift ? -6 : 0,
+    }} />
+  );
 
   const langs: { key: Lang; label: string }[] = [
     { key: 'fr', label: 'Français' },
@@ -2067,6 +2221,18 @@ function ProfileModal({
       <View style={s.modalBackdrop}>
         <View style={s.modalSheet}>
           <View style={s.modalHandle} />
+
+          {invite && (
+            <View style={{
+              flexDirection: 'row', alignItems: 'center', gap: 10,
+              backgroundColor: withAlpha(t.secondary, 0.15), borderWidth: 1,
+              borderColor: withAlpha(t.secondary, 0.4), borderRadius: radius.md,
+              padding: spacing.md, marginBottom: spacing.md,
+            }}>
+              <Ionicons name="color-palette" size={22} color={t.secondary} />
+              <Text style={{ flex: 1, color: t.text, fontSize: 14, lineHeight: 20 }}>{tr('customizeInvite')}</Text>
+            </View>
+          )}
 
           {/* Language switch */}
           <Text style={s.swatchLabel}>{tr('language')}</Text>
@@ -2088,6 +2254,52 @@ function ProfileModal({
           <Text style={[s.modalTitle, { marginTop: spacing.lg }]}>{tr('teamColors')}</Text>
           <Text style={s.placeholderSub}>{tr('teamColorsSub')}</Text>
 
+          {/* Organisation dropdown — applies a club's two brand colors at once */}
+          <Text style={s.swatchLabel}>{tr('organization')}</Text>
+          <Pressable
+            onPress={() => setOrgOpen((o) => !o)}
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 10,
+              borderWidth: 1, borderColor: withAlpha(t.text, 0.18), borderRadius: radius.md,
+              paddingVertical: 12, paddingHorizontal: 14,
+            }}
+          >
+            {selectedOrg ? (
+              <>
+                <View style={{ flexDirection: 'row' }}>{dot(selectedOrg.color_primary)}{dot(selectedOrg.color_secondary, true)}</View>
+                <Text style={{ flex: 1, color: t.text, fontWeight: '700' }}>{selectedOrg.name}</Text>
+              </>
+            ) : (
+              <Text style={{ flex: 1, color: t.muted }}>{tr('chooseOrg')}</Text>
+            )}
+            <Ionicons name={orgOpen ? 'chevron-up' : 'chevron-down'} size={18} color={t.muted} />
+          </Pressable>
+          {orgOpen && (
+            <View style={{ borderWidth: 1, borderColor: withAlpha(t.text, 0.18), borderRadius: radius.md, marginTop: 6, overflow: 'hidden' }}>
+              <ScrollView style={{ maxHeight: 220 }} nestedScrollEnabled>
+                {orgs.map((o) => (
+                  <Pressable
+                    key={o.id}
+                    onPress={() => {
+                      if (o.color_primary && o.color_secondary) setColors(o.color_primary, o.color_secondary);
+                      setSelectedOrgId(o.id);
+                      setOrgOpen(false);
+                    }}
+                    style={{
+                      flexDirection: 'row', alignItems: 'center', gap: 10,
+                      paddingVertical: 11, paddingHorizontal: 14,
+                      backgroundColor: selectedOrgId === o.id ? withAlpha(t.secondary, 0.14) : 'transparent',
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row' }}>{dot(o.color_primary)}{dot(o.color_secondary, true)}</View>
+                    <Text style={{ flex: 1, color: t.text }}>{o.name}</Text>
+                    {selectedOrgId === o.id && <Ionicons name="checkmark" size={16} color={t.secondary} />}
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
           {/* Live preview */}
           <View style={[s.preview, { backgroundColor: t.primary }]}>
             <Text style={[s.previewText, { color: t.onPrimary }]}>
@@ -2100,9 +2312,9 @@ function ProfileModal({
 
           <ScrollView style={{ maxHeight: 320 }}>
             <Text style={s.swatchLabel}>{tr('primaryColor')}</Text>
-            <SwatchGrid current={palette.primary} onSelect={setPrimary} />
+            <SwatchGrid current={palette.primary} onSelect={(hex) => { setPrimary(hex); setSelectedOrgId(null); }} />
             <Text style={s.swatchLabel}>{tr('secondaryColor')}</Text>
-            <SwatchGrid current={palette.secondary} onSelect={setSecondary} />
+            <SwatchGrid current={palette.secondary} onSelect={(hex) => { setSecondary(hex); setSelectedOrgId(null); }} />
           </ScrollView>
 
           <View style={s.modalActions}>
@@ -2470,6 +2682,7 @@ function makeStyles(t: Theme) {
     numJersey: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
     numDigits: { flexDirection: 'row', alignItems: 'center', gap: 2 },
     numDigit: { fontSize: 54, lineHeight: 60, fontWeight: '900', letterSpacing: -1, fontVariant: ['tabular-nums'] },
+    numName: { fontSize: 30, lineHeight: 40, fontWeight: '800', letterSpacing: 0.5 },
     numCaret: { width: 4, height: 40, borderRadius: 2, marginLeft: 4 },
 
     // ---- Matchup block (active match) ----
@@ -2539,6 +2752,16 @@ function makeStyles(t: Theme) {
     keyNum: { fontSize: 30, fontWeight: '700', color: t.primary },
     keySearch: { backgroundColor: t.secondary, gap: 2 },
     keySearchLabel: { fontSize: 12, fontWeight: '800' },
+    keySm: { height: 46, borderRadius: 10 },
+    keyLetter: { fontSize: 18, fontWeight: '700', color: t.primary },
+    keypadHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    keypadHint: { color: t.muted, fontSize: 12, fontWeight: '600' },
+    modeToggle: {
+      flexDirection: 'row', alignItems: 'center', gap: 5,
+      backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: t.cardBorder,
+      borderRadius: 999, paddingVertical: 5, paddingHorizontal: 11,
+    },
+    modeToggleText: { fontSize: 12, fontWeight: '800', color: t.primary, letterSpacing: 0.5 },
 
     placeholder: {
       flexDirection: 'row',

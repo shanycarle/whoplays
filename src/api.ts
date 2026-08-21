@@ -47,6 +47,15 @@ export type Team = {
   players?: RosterPlayer[];
 };
 
+// Une organisation (le « club ») porte les couleurs de marque. Plusieurs équipes
+// d'une même organisation partagent ces couleurs → on ne l'affiche qu'une fois.
+export type Organization = {
+  id: number;
+  name: string;
+  color_primary: string | null;
+  color_secondary: string | null;
+};
+
 export type SportTag = { key: string; label: string };
 
 export type Field = {
@@ -539,6 +548,55 @@ export async function findPlayerByNumber(
   }
 }
 
+/**
+ * GET /matches/{match}/players?name= — recherche par NOM (quand on ne connaît
+ * pas le numéro). Renvoie chaque joueur dont le PRÉNOM OU LE NOM COMMENCE par le
+ * texte tapé (préfixe par mot, pas « contient »). Trié alphabétiquement. [] si aucun.
+ */
+export async function findPlayerByName(
+  matchId: number,
+  name: string,
+): Promise<PlayerHit[]> {
+  const q = name.trim().toLowerCase();
+  if (!q) return [];
+
+  // Vrai si un des mots du nom (prénom ou nom de famille) commence par la saisie.
+  const startsWord = (full: string | null) =>
+    (full ?? '').toLowerCase().split(/\s+/).some((w) => w.startsWith(q));
+
+  if (USE_MOCK_DATA) {
+    const match = MATCHES.find((m) => m.id === matchId) ?? MATCHES[0];
+    const hits: PlayerHit[] = [];
+    for (const lineup of match.lineups ?? []) {
+      for (const entry of lineup.entries ?? []) {
+        if (startsWord(entry.full_name)) {
+          hits.push({
+            player_id: entry.player_id,
+            full_name: entry.full_name,
+            jersey_number: entry.jersey_number,
+            position: entry.position,
+            team: lineup.team?.name ?? null,
+            team_id: lineup.team?.id ?? 0,
+            photo_path: entry.photo_path ?? null,
+          });
+        }
+      }
+    }
+    hits.sort((a, b) => (a.full_name ?? '').localeCompare(b.full_name ?? ''));
+    return hits;
+  }
+
+  try {
+    const res = await request<{ data: PlayerHit[] }>(
+      `/matches/${matchId}/players?name=${encodeURIComponent(name)}`,
+    );
+    return res.data;
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) return [];
+    throw e;
+  }
+}
+
 // Per-player profile overrides for the demo (keyed by player_id). Anything set
 // here wins over the generic mock profile; null values hide a field.
 const MOCK_PROFILE_OVERRIDES: Record<number, Partial<PlayerProfile>> = {
@@ -658,6 +716,25 @@ export async function nearbyMatches(
   });
   if (sport) qs.set('sport', sport);
   const res = await request<{ data: Match[] }>(`/matches/nearby?${qs.toString()}`);
+  return res.data;
+}
+
+/**
+ * GET /organizations — la liste des organisations (clubs) avec leurs 2 couleurs
+ * de marque. Une organisation = une entrée, même si elle a plusieurs équipes.
+ * Sert au menu déroulant de personnalisation (thème aux couleurs du club).
+ */
+export async function listOrganizations(): Promise<Organization[]> {
+  if (USE_MOCK_DATA) {
+    return [
+      { id: 1, name: 'Vert et Or', color_primary: '#235b3b', color_secondary: '#bf9800' },
+      { id: 2, name: 'Estacades', color_primary: '#0f2a3f', color_secondary: '#b1987a' },
+      { id: 3, name: 'Diablos', color_primary: '#7b1113', color_secondary: '#e2c044' },
+      { id: 4, name: 'Titans', color_primary: '#1b2a4a', color_secondary: '#9aa4b2' },
+    ];
+  }
+
+  const res = await request<{ data: Organization[] }>('/organizations');
   return res.data;
 }
 

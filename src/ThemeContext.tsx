@@ -24,6 +24,7 @@ type ThemeContextValue = {
   palette: Palette;
   setPrimary: (hex: string) => void;
   setSecondary: (hex: string) => void;
+  setColors: (primary: string, secondary: string) => void;
   reset: () => void;
 };
 
@@ -63,6 +64,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       palette,
       setPrimary: (hex) => persist({ ...palette, primary: hex }),
       setSecondary: (hex) => persist({ ...palette, secondary: hex }),
+      setColors: (primary, secondary) => persist({ primary, secondary }),
       reset: () => persist({ primary: DEFAULT_PRIMARY, secondary: DEFAULT_SECONDARY }),
     }),
     [palette, persist],

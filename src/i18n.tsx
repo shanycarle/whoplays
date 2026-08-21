@@ -10,6 +10,8 @@ type Dict = Record<string, { fr: string; en: string }>;
 const STRINGS: Dict = {
   // Top panel / search
   findByNumber: { fr: 'TROUVEZ LE JOUEUR PAR SON NUMÉRO', en: 'FIND THE PLAYER BY NUMBER' },
+  findByName: { fr: 'TROUVEZ LE JOUEUR PAR SON NOM', en: 'FIND THE PLAYER BY NAME' },
+  noNumberHint: { fr: 'Vous ne connaissez pas le numéro ?', en: "Don't know the number?" },
   enterNumberPh: { fr: 'Entrez le numéro du joueur', en: "Enter the player's number" },
   noFieldNearby: { fr: 'Aucun terrain à proximité', en: 'No field nearby' },
   locationUnavailable: { fr: 'Localisation indisponible', en: 'Location unavailable' },
@@ -34,6 +36,7 @@ const STRINGS: Dict = {
 
   // Result card
   enterNumberTitle: { fr: 'ENTREZ LE NUMÉRO', en: 'ENTER A NUMBER' },
+  enterNameTitle: { fr: 'ENTREZ LE NOM', en: 'ENTER A NAME' },
   nameWillShow: { fr: "Le nom du joueur s'affichera ici", en: "The player's name will appear here" },
   noLiveMatch: { fr: 'AUCUN MATCH EN COURS', en: 'NO MATCH IN PROGRESS' },
   approachField: { fr: 'Approche-toi du terrain pendant un match', en: 'Get near the field during a match' },
@@ -41,6 +44,7 @@ const STRINGS: Dict = {
   numberN: { fr: 'Numéro {n}', en: 'Number {n}' },
   unknownPlayer: { fr: 'Joueur inconnu', en: 'Unknown player' },
   noNumberTitle: { fr: 'AUCUN NUMÉRO « {n} »', en: 'NO NUMBER “{n}”' },
+  noNameTitle: { fr: 'AUCUN JOUEUR « {n} »', en: 'NO PLAYER “{n}”' },
   noNumberSub: { fr: 'Aucun numéro ne contient ces chiffres', en: 'No number contains these digits' },
 
   // Recents
@@ -90,6 +94,12 @@ const STRINGS: Dict = {
   },
   primaryColor: { fr: 'Couleur principale', en: 'Primary color' },
   secondaryColor: { fr: 'Couleur secondaire', en: 'Secondary color' },
+  organization: { fr: 'Organisation', en: 'Organization' },
+  chooseOrg: { fr: 'Choisir une organisation…', en: 'Choose an organization…' },
+  customizeInvite: {
+    fr: 'Bienvenue ! Personnalisez WhoPlays aux couleurs de votre équipe favorite.',
+    en: 'Welcome! Personalize WhoPlays with your favorite team’s colors.',
+  },
   language: { fr: 'Langue', en: 'Language' },
   reset: { fr: 'Réinitialiser', en: 'Reset' },
   close: { fr: 'Fermer', en: 'Close' },
